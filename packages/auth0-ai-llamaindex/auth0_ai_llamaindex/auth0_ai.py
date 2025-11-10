@@ -44,7 +44,7 @@ class Auth0AI:
 
             with_google_calendar_access = auth0_ai.with_token_vault(
                 connection="google-oauth2",
-                scopes=["https://www.googleapis.com/auth/calendar.freebusy"],
+                scopes=["openid", "https://www.googleapis.com/auth/calendar.freebusy"],
                 refresh_token=lambda *_args, **_kwargs: session["user"]["refresh_token"],
             )
 

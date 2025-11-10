@@ -12,20 +12,25 @@
     - **Allowed Callback URLs**: `http://localhost:3000/auth/callback`
     - **Allowed Logout URLs**: `http://localhost:3000`
     - **Advanced Settings -> Grant Types**: `Refresh Token` and `Token Vault` (or `urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token`)
+    - **Allow Refresh Token Rotation**: currently you should disable this setting if you are using Token Vault for token exchanges with a refresh token.
   - Either **Google**, **Slack** or **Github** social connections enabled for the application:
     - **Google connection** set up instructions:
       - Create a [Google OAuth 2.0 Client](https://console.cloud.google.com/apis/credentials) configured with access to the `https://www.googleapis.com/auth/calendar.freebusy` scope (Google Calendar API).
       - On Auth0 Dashboard, set up the client ID and secret from the previously created Google client.
       - Enable following settings:
+        - **Use for Connected Accounts with Token Vault** enabled.
         - **Offline access** enabled.
         - **https://www.googleapis.com/auth/calendar.freebusy** scope granted.
-        - **Token Vault** enabled.
     - **Slack connection** set up instructions:
       - Create a [Slack App](https://api.slack.com/apps) and follow the [Auth0's Signin with Slack](https://marketplace.auth0.com/integrations/sign-in-with-slack) `installation` instructions to set up the connection.
-      - On Slack's OAuth & Permission settings, make sure to add the `channels:read` scope to the User Token scopes.
+      - Enable following settings:
+        - **Use for Connected Accounts with Token Vault** enabled.
+        - On Slack's OAuth & Permission settings, make sure to add the `channels:read` scope to the User Token scopes.
     - **Github connection** set up instructions:
       - Register a new app in [GitHub Developer Settings: OAuth Apps](https://github.com/settings/developers#oauth-apps) and follow the [Auth0's Github social connection](https://marketplace.auth0.com/integrations/github-social-connection) `installation` instructions to set up the connection.
       - On Auth0 Dashboard, set up the client ID and secret from the previously created Github App.
+      - Enable following settings:
+        - **Use for Connected Accounts with Token Vault** enabled.
 
 ### Setup
 

@@ -10,7 +10,7 @@ class TokenVaultInterrupt(Auth0Interrupt):
 
     code: Final[str] = "TOKEN_VAULT_ERROR"
 
-    def __init__(self, message: str, connection: str, scopes: list[str], required_scopes: list[str]):
+    def __init__(self, message: str, connection: str, scopes: list[str], required_scopes: list[str], authorization_params: dict[str, str] = None):
         """
         Initializes a TokenVaultInterrupt instance.
 
@@ -20,18 +20,21 @@ class TokenVaultInterrupt(Auth0Interrupt):
             scopes (list[str]): The scopes required to access the external service as stated in the authorizer.
             required_scopes (list[str]): The union between the current scopes of the Access Token plus the required scopes.
                                          This is the list of scopes that will be used to request a new Access Token.
+            authorization_params (dict[str, str]): Optional. Additional authorization parameters that are required to connect the account.
         """
         super().__init__(message, self.code)
         self.connection = connection
         self.scopes = scopes
         self.required_scopes = required_scopes
+        self.authorization_params = authorization_params or {}
     
     def __copy__(self):
         return type(self)(
             self.args[0],
             self.connection,
             self.scopes,
-            self.required_scopes
+            self.required_scopes,
+            self.authorization_params
         )
 
     def __deepcopy__(self, memo):
@@ -41,6 +44,7 @@ class TokenVaultInterrupt(Auth0Interrupt):
             copy.deepcopy(self.connection, memo),
             copy.deepcopy(self.scopes, memo),
             copy.deepcopy(self.required_scopes, memo),
+            copy.deepcopy(self.authorization_params, memo),
         )
 
 
