@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auth0-ai-langchain"
-version = "1.0.0b4"
+version = "1.0.0b5"
 description = "This package is an SDK for building secure AI-powered applications using Auth0, Okta FGA and LangChain."
 license = "apache-2.0"
 homepage = "https://auth0.com"
@@ -14,7 +14,7 @@ langchain = "^0.3.26"
 langgraph-sdk = "^0.1.73"
 langchain-core = "^0.3.69"
 langgraph = "^0.5.3"
-# auth0-ai = "^1.0.0b4"
+# auth0-ai = "^1.0.0b5"
 auth0-ai = { path = "../auth0-ai", develop = true }
 
 [tool.poetry.group.test.dependencies]

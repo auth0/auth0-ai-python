@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auth0-ai-llamaindex"
-version = "1.0.0b4"
+version = "1.0.0b5"
 description = "This package is an SDK for building secure AI-powered applications using Auth0, Okta FGA and LlamaIndex."
 license = "apache-2.0"
 homepage = "https://auth0.com"
@@ -11,7 +11,7 @@ readme = "README.md"
 python = "^3.11"
 llama-index = "^0.14"
 openfga-sdk = "^0.9.5"
-# auth0-ai = "^1.0.0b4"
+# auth0-ai = "^1.0.0b5"
 auth0-ai = { path = "../auth0-ai", develop = true }
 
 [tool.poetry.group.test.dependencies]
