@@ -1,11 +1,13 @@
 import asyncio
-from hypercorn.config import Config
+
 from hypercorn.asyncio import serve
+from hypercorn.config import Config
 from src.app.app import app
+
 
 def main():
     config = Config()
-    config.bind = ["0.0.0.0:3000"]
+    config.bind = ["localhost:3000"]
     config.worker_class = "asyncio"
     config.use_reloader = True
 

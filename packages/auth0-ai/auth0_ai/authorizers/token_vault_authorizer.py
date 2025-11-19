@@ -4,15 +4,20 @@ import inspect
 import json
 import os
 from contextlib import asynccontextmanager
-from typing import Awaitable, Callable, Generic, Optional, Any, TypedDict, Union
+from typing import (Any, Awaitable, Callable, Generic, Optional, TypedDict,
+                    Union)
+
 from auth0 import Auth0Error
 from auth0.authentication.get_token import GetToken
-from auth0_ai.authorizers.context import AuthContext, ContextGetter, ns_from_context
-from auth0_ai.authorizers.types import Auth0ClientParams, AuthorizerToolParameter, ToolInput
+from auth0_ai.authorizers.context import (AuthContext, ContextGetter,
+                                          ns_from_context)
+from auth0_ai.authorizers.types import (Auth0ClientParams,
+                                        AuthorizerToolParameter, ToolInput)
 from auth0_ai.credentials import TokenResponse
 from auth0_ai.interrupts.auth0_interrupt import Auth0Interrupt
-from auth0_ai.interrupts.token_vault_interrupt import TokenVaultError, TokenVaultInterrupt
-from auth0_ai.stores import Store, SubStore, InMemoryStore
+from auth0_ai.interrupts.token_vault_interrupt import (TokenVaultError,
+                                                       TokenVaultInterrupt)
+from auth0_ai.stores import InMemoryStore, Store, SubStore
 from auth0_ai.utils import omit
 
 # Subject / requested token type constants
@@ -20,20 +25,27 @@ SUBJECT_TYPE_REFRESH_TOKEN = "urn:ietf:params:oauth:token-type:refresh_token"
 SUBJECT_TYPE_ACCESS_TOKEN = "urn:ietf:params:oauth:token-type:access_token"
 REQUESTED_TOKEN_TYPE_TOKEN_VAULT_ACCESS_TOKEN = "http://auth0.com/oauth/token-type/federated-connection-access-token"
 
+
 class AsyncStorageValue(TypedDict):
     context: Any
     connection: str
     scopes: list[str]
     current_scopes: Optional[list[str]]
     credentials: Optional[TokenResponse]
+    authorization_params: Optional[dict[str, str]]
 
-_local_storage: contextvars.ContextVar[Optional[AsyncStorageValue]] = contextvars.ContextVar("local_storage", default=None)
+
+_local_storage: contextvars.ContextVar[Optional[AsyncStorageValue]] = contextvars.ContextVar(
+    "local_storage", default=None)
+
 
 def _get_local_storage() -> AsyncStorageValue:
     store = _local_storage.get()
     if store is None:
-        raise RuntimeError("The tool must be wrapped with the with_token_vault function.")
+        raise RuntimeError(
+            "The tool must be wrapped with the with_token_vault function.")
     return store
+
 
 def _update_local_storage(data: AsyncStorageValue) -> None:
     store = _get_local_storage()
@@ -41,23 +53,28 @@ def _update_local_storage(data: AsyncStorageValue) -> None:
     updated.update(data)
     _local_storage.set(updated)
 
+
 @asynccontextmanager
 async def _run_with_local_storage(data: AsyncStorageValue):
     if _local_storage.get() is not None:
-        raise RuntimeError("Cannot nest tool calls that require Token Vault authorization.")
+        raise RuntimeError(
+            "Cannot nest tool calls that require Token Vault authorization.")
     token = _local_storage.set(data)
     try:
         yield
     finally:
         _local_storage.reset(token)
 
+
 def get_credentials_from_token_vault() -> TokenResponse | None:
     store = _get_local_storage()
     return store.get("credentials")
 
+
 def get_access_token_from_token_vault() -> str | None:
     store = _get_local_storage()
     return store.get("credentials", {}).get("access_token")
+
 
 class TokenVaultAuthorizerParams(Generic[ToolInput]):
     def __init__(
@@ -76,7 +93,8 @@ class TokenVaultAuthorizerParams(Generic[ToolInput]):
         ]] = None,
         login_hint: Optional[str] = None,
         store: Optional[Store] = None,
-        credentials_context: Optional[AuthContext] = "thread"
+        credentials_context: Optional[AuthContext] = "thread",
+        authorization_params: Optional[dict[str, str]] = None
     ):
         """
         Parameters for the Token Vault authorizer.
@@ -97,6 +115,7 @@ class TokenVaultAuthorizerParams(Generic[ToolInput]):
                 - "agent": Credentials are shared globally across all threads and tools in the agent.
                 - "tool": Credentials are shared across multiple calls to the same tool within the same thread.
                 - "tool-call": Credentials are valid only for a single invocation of the tool.
+            authorization_params: Optional. Additional authorization parameters that are required to connect the account.
         """
         def wrap(val, result_type):
             if isinstance(val, AuthorizerToolParameter):
@@ -107,8 +126,10 @@ class TokenVaultAuthorizerParams(Generic[ToolInput]):
         self.refresh_token = wrap(refresh_token, str | None)
         self.access_token = wrap(access_token, str | None)
         self.login_hint = login_hint
+        self.authorization_params = authorization_params
         self.store = store
         self.credentials_context = credentials_context
+
 
 class TokenVaultAuthorizerBase(Generic[ToolInput]):
     def __init__(
@@ -133,9 +154,10 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
         self.get_token = GetToken(**self.auth0)
 
         # TODO: consider moving this to Auth0AI classes
-        sub_store = SubStore(params.store or InMemoryStore()).create_sub_store("AUTH0_AI_TOKEN_VAULT")
+        sub_store = SubStore(params.store or InMemoryStore()
+                             ).create_sub_store("AUTH0_AI_TOKEN_VAULT")
         instance_id = self._get_instance_id()
-        
+
         self.credentials_store = SubStore[TokenResponse](sub_store, {
             "base_namespace": [instance_id, "credentials"],
             "get_ttl": lambda credential: credential["expires_in"] * 1000 if "expires_in" in credential else None
@@ -172,13 +194,15 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
         store = _get_local_storage()
         scopes = store["scopes"]
         connection = store["connection"]
+        authorization_params = store["authorization_params"]
 
         if token_response is None:
             raise TokenVaultInterrupt(
                 f"Authorization required to access the Token Vault connection: {connection}",
                 connection,
                 scopes,
-                scopes
+                scopes,
+                authorization_params
             )
 
         current_scopes = token_response["scope"]
@@ -191,7 +215,8 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
                 f"Authorization required to access the Token Vault connection: {connection}. Missing scopes: {', '.join(missing_scopes)}",
                 connection,
                 scopes,
-                granted_union
+                granted_union,
+                authorization_params
             )
 
     async def get_access_token_impl(self, *args: ToolInput.args, **kwargs: ToolInput.kwargs) -> TokenResponse | None:
@@ -222,7 +247,8 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
             )
             if login_hint:
                 request_kwargs["login_hint"] = login_hint
-            response = self.get_token.access_token_for_connection(**request_kwargs)
+            response = self.get_token.access_token_for_connection(
+                **request_kwargs)
             return TokenResponse(
                 access_token=response["access_token"],
                 expires_in=response["expires_in"],
@@ -232,7 +258,8 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
                 refresh_token=response.get("refresh_token"),
             )
         except Auth0Error as err:
-            raise TokenVaultError(err.message) if 400 <= err.status_code <= 499 else err
+            raise TokenVaultError(
+                err.message) if 400 <= err.status_code <= 499 else err
 
     async def get_refresh_token(self, *args: ToolInput.args, **kwargs: ToolInput.kwargs):
         token = await self.params.refresh_token.resolve(*args, **kwargs)
@@ -256,11 +283,13 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
             local_store = {
                 "context": context,
                 "scopes": self.params.scopes,
-                "connection": self.params.connection
+                "connection": self.params.connection,
+                "authorization_params": self.params.authorization_params
             }
 
             async with _run_with_local_storage(local_store):
-                credentials_ns = ns_from_context(self.params.credentials_context, context)
+                credentials_ns = ns_from_context(
+                    self.params.credentials_context, context)
 
                 try:
                     credentials = await self.credentials_store.get(credentials_ns, "credential")
@@ -269,7 +298,7 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
                         credentials = await self.get_access_token_impl(*args, **kwargs)
                         self.validate_token(credentials)
                         await self.credentials_store.put(credentials_ns, "credential", credentials)
-                    
+
                     _update_local_storage({"credentials": credentials})
 
                     if inspect.iscoroutinefunction(execute):
@@ -277,16 +306,16 @@ class TokenVaultAuthorizerBase(Generic[ToolInput]):
                     else:
                         return execute(*args, **kwargs)
                 except TokenVaultError as err:
-                    self.credentials_store.delete(credentials_ns, "credential")
+                    await self.credentials_store.delete(credentials_ns, "credential")
                     interrupt = TokenVaultInterrupt(
                         str(err),
                         local_store["connection"],
                         local_store["scopes"],
-                        local_store["scopes"]
+                        local_store["scopes"],
+                        local_store["authorization_params"]
                     )
                     return self._handle_authorization_interrupts(interrupt)
                 except Auth0Interrupt as err:
-                    self.credentials_store.delete(credentials_ns, "credential")
+                    await self.credentials_store.delete(credentials_ns, "credential")
                     return self._handle_authorization_interrupts(err)
-
         return wrapped_execute

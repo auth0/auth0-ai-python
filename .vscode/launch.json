@@ -1,0 +1,44 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Start LangChain Examples",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/calling-apis/langchain-examples/scripts/start_debug.py",
+            "cwd": "${workspaceFolder}/examples/calling-apis/langchain-examples",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/examples/calling-apis/langchain-examples/src"
+            },
+            "python": "${workspaceFolder}/examples/calling-apis/langchain-examples/.venv/bin/python"
+        },
+        {
+            "name": "Python: LangGraph Up",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/calling-apis/langchain-examples/scripts/langgraph_up.py",
+            "cwd": "${workspaceFolder}/examples/calling-apis/langchain-examples",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/examples/calling-apis/langchain-examples/src"
+            },
+            "python": "${workspaceFolder}/examples/calling-apis/langchain-examples/.venv/bin/python"
+        },
+        {
+            "name": "Python: Start LlamaIndex Examples",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/examples/calling-apis/llama-index-examples/scripts/start_debug.py",
+            "cwd": "${workspaceFolder}/examples/calling-apis/llama-index-examples",
+            "justMyCode": false,
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}/examples/calling-apis/llama-index-examples/src"
+            },
+            "python": "${workspaceFolder}/examples/calling-apis/llama-index-examples/.venv/bin/python"
+        }
+    ]
+}

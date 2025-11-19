@@ -36,7 +36,7 @@ def check_user_calendar_tool_function(date: datetime):
     response = requests.post(
         url,
         headers={
-            "Authorization": f"{credentials["token_type"]} {credentials["access_token"]}"},
+            "Authorization": f"{credentials['token_type']} {credentials['access_token']}"},
         json=body
     )
 

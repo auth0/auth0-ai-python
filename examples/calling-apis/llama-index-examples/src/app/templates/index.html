@@ -11,7 +11,7 @@
           "react/": "https://esm.sh/react@19.1.0&dev/",
           "react-dom": "https://esm.sh/react-dom@19.1.0?dev",
           "react-dom/": "https://esm.sh/react-dom@19.1.0&dev/",
-          "@auth0/ai-components/": "https://esm.sh/@auth0/ai-components/",
+          "@auth0/ai-components/": "https://esm.sh/@auth0/ai-components@4/",
           "@auth0/ai/": "https://esm.sh/@auth0/ai/",
           "@auth0-lab/ui-components/registry/components/user-button.tsx": "https://esm.sh/gh/auth0-lab/a0-components@1f303e5/registry/components/user-button.tsx?dev&bundle=false&external=@/components,@/lib,react,react-dom"
         },
@@ -215,7 +215,15 @@
         return (
           <header className="w-full max-w-7xl h-20 mx-auto flex items-center justify-between border-b border-gray-200 px-4 xl:px-0">
             <h2 className="font-semibold text-xl">Auth0 AI | Demo</h2>
-            <UserButton user={user} logoutUrl="/auth/logout" />
+            <div className="flex items-center gap-4">
+              <a
+                href="/"
+                className="bg-neutral-600 hover:bg-neutral-700 text-white px-4 py-2 rounded-lg transition text-sm font-medium"
+              >
+                New Chat
+              </a>
+              <UserButton user={user} logoutUrl="/auth/logout" />
+            </div>
           </header>
         );
       }
@@ -255,14 +263,17 @@
         if (!interrupt) {
           return null;
         }
-
-        const { connection, required_scopes: requiredScopes } = interrupt;
+        const {
+          connection,
+          required_scopes: requiredScopes,
+          authorization_params: authorizationParams
+        } = interrupt;
         return (
           <TokenVaultConsent
             mode="redirect"
-            interrupt={({ connection, requiredScopes })}
+            interrupt={({ connection, requiredScopes, authorizationParams })}
             connectWidget={({ title: interrupt?.message, description: "Description..." })}
-            auth={({ returnTo: "/chat/resume" })}
+            auth={({ returnTo: "/chat/resume/{{ thread_id }}" })}
           />
         );
       }
@@ -347,7 +358,7 @@
             const res = await fetch("/api/chat", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ message }),
+              body: JSON.stringify({ message, thread_id: "{{ thread_id }}" }),
             });
 
             const data = await res.json();
@@ -407,7 +418,7 @@
 
       const root = createRoot(document.getElementById('app'));
       root.render(
-        <ContextProvider user={user} messages={messages} interrupt={interrupt}>
+        <ContextProvider user={user} messages={messages} interrupt={interrupt?.value}>
           <App />
         </ContextProvider>
       );

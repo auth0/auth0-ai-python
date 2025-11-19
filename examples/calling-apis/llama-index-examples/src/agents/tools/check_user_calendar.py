@@ -1,28 +1,31 @@
-import requests
 from datetime import datetime, timedelta
 from typing import Annotated
+
+import requests
+from auth0_ai_llamaindex.token_vault import (TokenVaultError,
+                                             get_credentials_from_token_vault)
 from llama_index.core.tools import FunctionTool
 
-from auth0_ai_llamaindex.token_vault import TokenVaultError, get_credentials_from_token_vault
-from src.auth0.auth0_ai import with_calendar_free_busy_access
+from ...auth0.auth0_ai import with_calendar_free_busy_access
 
 
-def add_hours(dt: datetime, hours: int) -> str:
-    return (dt + timedelta(hours=hours)).isoformat()
+def format_date(dt: datetime) -> str:
+    return dt.isoformat().replace("+00:00", "") + "Z"
 
 
 def check_user_calendar_tool_function(
-    dateTime: Annotated[str, "Date and time in ISO 8601 format."]
+    date: Annotated[str, "Date and time in ISO 8601 format."]
 ):
     credentials = get_credentials_from_token_vault()
     if not credentials:
         raise ValueError(
             "Authorization required to access the Token Vault connection")
 
+    parsed_date = datetime.fromisoformat(date)
     url = "https://www.googleapis.com/calendar/v3/freeBusy"
     body = {
-        "timeMin": dateTime + "Z",
-        "timeMax": add_hours(datetime.fromisoformat(dateTime), 1) + "Z",
+        "timeMin": format_date(parsed_date),
+        "timeMax": format_date(parsed_date + timedelta(hours=1)),
         "timeZone": "UTC",
         "items": [{"id": "primary"}]
     }
@@ -30,7 +33,7 @@ def check_user_calendar_tool_function(
     response = requests.post(
         url,
         headers={
-            "Authorization": f"{credentials["token_type"]} {credentials["access_token"]}"},
+            "Authorization": f"{credentials['token_type']} {credentials['access_token']}"},
         json=body
     )
 

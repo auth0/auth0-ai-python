@@ -12,15 +12,16 @@ start = "scripts.start:main"
 [tool.poetry.dependencies]
 python = "^3.11"
 python-dotenv = "^1.1.1"
-flask = { extras = ["async"], version = "^3.1.0" }
+fastapi = "^0.115.14"
 requests = "^2.32.4"
 hypercorn = "^0.17.3"
-llama-index = "^0.13.2"
-auth0-server-python = "^1.0.0b4"
+llama-index = "^0.14"
+auth0-fastapi = "1.0.0b5"
 auth0-ai-llamaindex = { path = "../../../packages/auth0-ai-llamaindex", develop = true }
 slack-sdk = "^3.36.0"
 pygithub = "^2.6.1"
-asgiref = "^3.9.1"
+itsdangerous = "^2.2.0"
+jinja2 = "^3.1.6"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,9 +1,7 @@
 import asyncio
-from asgiref.wsgi import WsgiToAsgi
 from hypercorn.config import Config
 from hypercorn.asyncio import serve
 from src.app.app import app
-
 
 def main():
     config = Config()
@@ -11,4 +9,6 @@ def main():
     config.worker_class = "asyncio"
     config.use_reloader = True
 
-    asyncio.run(serve(WsgiToAsgi(app), config))
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(serve(app, config))

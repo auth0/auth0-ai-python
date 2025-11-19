@@ -157,6 +157,8 @@ The `Auth0AI.with_token_vault` function exchanges user's refresh token taken, by
 
 Full Example of [Calling APIs On User's Behalf](https://github.com/auth0/auth0-ai-python/tree/main/examples/calling-apis/langchain-examples).
 
+### Basic Usage
+
 1. Define a tool with the proper authorizer:
 
 ```python
@@ -169,9 +171,10 @@ auth0_ai = Auth0AI()
 
 with_google_calendar_access = auth0_ai.with_token_vault(
     connection="google-oauth2",
-    scopes=["https://www.googleapis.com/auth/calendar.freebusy"],
+    scopes=["openid", "https://www.googleapis.com/auth/calendar.freebusy"],
     # Optional:
     # refresh_token=lambda *_, **__: ensure_config().get("configurable", {}).get("_credentials", {}).get("refresh_token"),
+    # authorization_params={"login_hint": "user@example.com", "ui_locales": "en"}
     # store=InMemoryStore(),
 )
 
@@ -210,6 +213,18 @@ workflow = (
 ```
 
 3. Handle interruptions properly. For example, if the tool does not have access to user's Google Calendar, it will throw an interruption. See [Handling Interrupts](#handling-interrupts) section.
+
+### Additional Authorization Parameters
+
+The `authorization_params` parameter is optional and can be used to pass additional authorization parameters needed to connect an account (e.g., `login_hint`, `ui_locales`):
+
+```python
+with_google_calendar_access = auth0_ai.with_token_vault(
+    connection="google-oauth2",
+    scopes=["openid", "https://www.googleapis.com/auth/calendar.freebusy"],
+    authorization_params={"login_hint": "user@example.com", "ui_locales": "en"}
+)
+```
 
 ## RAG with FGA
 

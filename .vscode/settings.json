@@ -1,6 +1,15 @@
 {
   "poetryMonorepo.appendExtraPaths": true,
   "python.analysis.extraPaths": [
+    "examples/calling-apis/langchain-examples/scripts",
+    "examples/calling-apis/llama-index-examples/src",
+    "examples/calling-apis/langchain-examples/src",
+    "packages/auth0-ai/auth0_ai",
+    "examples/calling-apis/llama-index-examples/.venv",
+    "packages/auth0-ai-llamaindex/auth0_ai_llamaindex",
+    "examples/calling-apis/llama-index-examples/scripts",
+    "packages/auth0-ai-langchain/auth0_ai_langchain",
+    "examples/calling-apis/langchain-examples/.venv",
     "examples/async-authorization/langchain-examples",
     "examples/async-authorization/llama-index-examples",
     "examples/async-authorization/sample-api",
@@ -27,5 +36,8 @@
       "source.fixAll": "always"
     },
     "editor.defaultFormatter": "ms-python.autopep8"
+  },
+  "[html]": {
+    "editor.formatOnSave": false
   }
 }
