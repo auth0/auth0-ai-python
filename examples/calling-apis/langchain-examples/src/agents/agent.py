@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Annotated, Sequence, TypedDict
 
-from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.prebuilt import ToolNode
@@ -19,7 +20,15 @@ llm = ChatOpenAI(
 
 
 async def call_llm(state: State):
-    response = await llm.ainvoke(state["messages"])
+    messages = state["messages"]
+    system_prompt = f"""You are an assistant designed to answer random user's questions.
+**Additional Guidelines**:
+- Today’s date for reference: {datetime.now().isoformat()}
+"""
+    system_message = SystemMessage(content=system_prompt)
+    messages = [system_message] + messages
+
+    response = await llm.ainvoke(messages)
     return {"messages": [response]}
 
 
