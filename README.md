@@ -1,7 +1,6 @@
 # Auth0 AI for Python
 
-> [!WARNING]
-> Auth0 AI is currently **under heavy development**. We strictly follow [Semantic Versioning (SemVer)](https://semver.org/), meaning all **breaking changes will only occur in major versions**. However, please note that during this early phase, **major versions may be released frequently** as the API evolves. We recommend locking versions when using this in production.
+> ⚠️ **WARNING**: Auth0 AI for Python is currently **under heavy development**. We strictly follow [Semantic Versioning (SemVer)](https://semver.org/), meaning all **breaking changes will only occur in major versions**. However, please note that during this early phase, **major versions may be released frequently** as the API evolves. We recommend locking versions when using this in production.
 
 [Auth0 AI](https://www.auth0.ai/) helps you build secure AI-powered applications.
 
