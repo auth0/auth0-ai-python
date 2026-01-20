@@ -209,7 +209,7 @@ tests-mypy = ["mypy (>=1.11.1) ; platform_python_implementation == \"CPython\" a
 
 [[package]]
 name = "auth0-ai"
-version = "1.0.0b5"
+version = "1.0.0"
 description = "This package provides base abstractions for authentication and authorization in AI applications."
 optional = false
 python-versions = "^3.11"

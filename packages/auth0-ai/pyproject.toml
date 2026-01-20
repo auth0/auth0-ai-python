@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auth0-ai"
-version = "1.0.0b5"
+version = "1.0.0"
 description = "This package provides base abstractions for authentication and authorization in AI applications."
 license = "apache-2.0"
 homepage = "https://auth0.com"
