@@ -264,6 +264,23 @@ class TestWithTokenVault:
         assert "pending_interrupt" not in session.state
 
     @pytest.mark.asyncio
+    async def test_stale_interrupt_is_cleared_on_successful_retry(self):
+        """When authorization succeeds after a previous failure, the stale pending_interrupt is cleared."""
+        session = _mock_session()
+        session.state["pending_interrupt"] = TokenVaultInterrupt(
+            "stale", connection="google-oauth2", scopes=["openid"], required_scopes=["openid"]
+        )
+
+        wrapped = self._auth0_ai().with_token_vault(**_TOKEN_VAULT_PARAMS)(
+            FunctionTool(func=lambda: None, name="tool", description="Tool")
+        )
+
+        with patch.object(TokenVaultAuthorizerBase, "get_access_token_impl", _passing_mock()):
+            await wrapped.func(session=session)
+
+        assert "pending_interrupt" not in session.state
+
+    @pytest.mark.asyncio
     async def test_framework_kwargs_are_stripped_before_calling_original_function(self):
         """Framework-injected kwargs are removed before the original function is called."""
         received_kwargs: dict = {}

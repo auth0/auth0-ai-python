@@ -34,7 +34,7 @@ def _build_function_tool_kwargs(tool: FunctionTool) -> dict[str, Any]:
             continue
         if hasattr(tool, param_name):
             value = getattr(tool, param_name)
-            if value is not None or param.default is inspect._empty:
+            if value is not None or param.default is inspect.Parameter.empty:
                 init_kwargs[param_name] = value
     return init_kwargs
 
@@ -101,7 +101,9 @@ def tool_wrapper(tool: FunctionTool, protect_fn: Callable) -> FunctionTool:
                 return original_func(**kwargs)
 
         try:
-            return await protect_fn(get_context, execute_fn)(**kwargs)
+            result = await protect_fn(get_context, execute_fn)(**kwargs)
+            session.state.pop("pending_interrupt", None)
+            return result
         except TokenVaultInterrupt as e:
             session.state["pending_interrupt"] = e
             raise
