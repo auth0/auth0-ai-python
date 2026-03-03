@@ -8,8 +8,8 @@ authors = ["Auth0 <support@auth0.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.14"
-agent-framework = "^1.0.0rc2"
+python = "^3.11"
+agent-framework-core = "^1.0.0rc2"
 auth0-ai = "^1.0.2"
 
 [tool.poetry.group.test.dependencies]

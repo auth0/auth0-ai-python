@@ -2,6 +2,8 @@
 
 `auth0-ai-ms-agent` is an SDK for building secure AI-powered applications using [Auth0](https://www.auth0.ai/) and [Microsoft Agent Framework](https://github.com/microsoft/agent-framework).
 
+![Release](https://img.shields.io/pypi/v/auth0-ai-ms-agent) ![Downloads](https://img.shields.io/pypi/dw/auth0-ai-ms-agent) [![License](https://img.shields.io/:license-APACHE%202.0-blue.svg?style=flat)](https://opensource.org/license/apache-2-0)
+
 ## Installation
 
 > ⚠️ **WARNING**: `auth0-ai-ms-agent` is currently **under heavy development**. We strictly follow [Semantic Versioning (SemVer)](https://semver.org/), meaning all **breaking changes will only occur in major versions**. However, please note that during this early phase, **major versions may be released frequently** as the API evolves. We recommend locking versions when using this in production.
