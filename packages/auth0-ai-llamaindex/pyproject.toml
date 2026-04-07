@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "auth0-ai-llamaindex"
-version = "1.1.0"
+version = "1.0.2"
 description = "This package is an SDK for building secure AI-powered applications using Auth0, Okta FGA and LlamaIndex."
 license = "apache-2.0"
 homepage = "https://auth0.com"
