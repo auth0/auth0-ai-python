@@ -116,7 +116,7 @@ class FGARetriever(BaseRetriever):
                 }.values()
             )
             node_to_obj = {
-                nodeWithScore: check.object
+                nodeWithScore.id_: check.object
                 for check, nodeWithScore in zip(all_checks, nodes)
             }
 
@@ -132,8 +132,8 @@ class FGARetriever(BaseRetriever):
             return [
                 node
                 for node in nodes
-                if node_to_obj[node] in permissions_map
-                and permissions_map[node_to_obj[node]]
+                if node_to_obj[node.id_] in permissions_map
+                and permissions_map[node_to_obj[node.id_]]
             ]
 
     async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
