@@ -1,3 +1,4 @@
+import json
 import os
 from typing import Callable, Optional, List
 from llama_index.core.retrievers import BaseRetriever
@@ -13,6 +14,22 @@ from llama_index.core.schema import (
     NodeWithScore,
     QueryBundle,
 )
+
+
+def _check_key(check) -> tuple:
+    """
+    Build a complete, hashable identity for an FGA check.
+
+    Includes ``context`` (canonicalized with ``json.dumps(sort_keys=True)``,
+    which sorts keys at every depth and preserves all values) alongside
+    relation/object/user so that checks differing only by their condition
+    parameters are treated as distinct. Used as the single source of truth for
+    deduplication, the node-to-check mapping, and result correlation, so a
+    denied node can no longer inherit an allowed result.
+    """
+    context = getattr(check, "context", None)
+    context_key = json.dumps(context, sort_keys=True) if context else None
+    return (check.relation, check.object, check.user, context_key)
 
 
 class FGARetriever(BaseRetriever):
@@ -71,13 +88,10 @@ class FGARetriever(BaseRetriever):
                 self._query_builder(nodeWithScore.node) for nodeWithScore in nodes
             ]
             unique_checks = list(
-                {
-                    (check.relation, check.object, check.user): check
-                    for check in all_checks
-                }.values()
+                {_check_key(check): check for check in all_checks}.values()
             )
-            node_to_obj = {
-                nodeWithScore.id_: check.object
+            node_to_key = {
+                nodeWithScore.id_: _check_key(check)
                 for check, nodeWithScore in zip(all_checks, nodes)
             }
 
@@ -86,14 +100,15 @@ class FGARetriever(BaseRetriever):
             )
 
             permissions_map = {
-                result.request.object: result.allowed for result in fga_response.result
+                _check_key(result.request): result.allowed
+                for result in fga_response.result
             }
 
             return [
                 node
                 for node in nodes
-                if node_to_obj[node.id_] in permissions_map
-                and permissions_map[node_to_obj[node.id_]]
+                if node_to_key[node.id_] in permissions_map
+                and permissions_map[node_to_key[node.id_]]
             ]
 
     def _retrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:
@@ -110,13 +125,10 @@ class FGARetriever(BaseRetriever):
                 self._query_builder(nodeWithScore.node) for nodeWithScore in nodes
             ]
             unique_checks = list(
-                {
-                    (check.relation, check.object, check.user): check
-                    for check in all_checks
-                }.values()
+                {_check_key(check): check for check in all_checks}.values()
             )
-            node_to_obj = {
-                nodeWithScore.id_: check.object
+            node_to_key = {
+                nodeWithScore.id_: _check_key(check)
                 for check, nodeWithScore in zip(all_checks, nodes)
             }
 
@@ -126,14 +138,15 @@ class FGARetriever(BaseRetriever):
             await fga_client.close()
 
             permissions_map = {
-                result.request.object: result.allowed for result in fga_response.result
+                _check_key(result.request): result.allowed
+                for result in fga_response.result
             }
 
             return [
                 node
                 for node in nodes
-                if node_to_obj[node.id_] in permissions_map
-                and permissions_map[node_to_obj[node.id_]]
+                if node_to_key[node.id_] in permissions_map
+                and permissions_map[node_to_key[node.id_]]
             ]
 
     async def _aretrieve(self, query_bundle: QueryBundle) -> List[NodeWithScore]:

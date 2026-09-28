@@ -41,7 +41,8 @@ def create_test_data(num_nodes=2):
         node.node = MagicMock(spec=Node)
     check_requests = [
         MagicMock(spec=ClientBatchCheckItem,
-                  tuple_key=f"check_{i}", object=f"doc:{i}")
+                  tuple_key=f"check_{i}", object=f"doc:{i}",
+                  relation="viewer", user="user:jane", context=None)
         for i in range(num_nodes)
     ]
     return nodes, check_requests
@@ -80,7 +81,9 @@ async def test_async_query_builder_integration(
             MagicMock(
                 allowed=True,
                 request=MagicMock(spec=ClientBatchCheckItem,
-                                  object=f"doc:{i}"),
+                                  object=f"doc:{i}",
+                                  relation="viewer", user="user:jane",
+                                  context=None),
             )
             for i in range(2)
         ]
@@ -121,7 +124,9 @@ def test_sync_query_builder_integration(
             MagicMock(
                 allowed=True,
                 request=MagicMock(spec=ClientBatchCheckItem,
-                                  object=f"doc:{i}"),
+                                  object=f"doc:{i}",
+                                  relation="viewer", user="user:jane",
+                                  context=None),
             )
             for i in range(2)
         ]

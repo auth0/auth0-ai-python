@@ -60,8 +60,12 @@ async def test_async_get_relevant_docs(
     query = "test_query"
     run_manager = MagicMock()
     docs = [MagicMock(spec=Document, id=i) for i in range(doc_count)]
+    # Checks must carry their full identity (relation/object/user/context) so
+    # that each result correlates back to exactly one check. `context=None`
+    # mirrors a query builder that sets no condition parameters.
     mock_query_builder.side_effect = [
-        MagicMock(spec=ClientBatchCheckItem, object=f"doc:{i}")
+        MagicMock(spec=ClientBatchCheckItem, object=f"doc:{i}",
+                  relation="viewer", user="user:jane", context=None)
         for i in range(doc_count)
     ]
     mock_results = MagicMock(
@@ -69,7 +73,9 @@ async def test_async_get_relevant_docs(
             MagicMock(
                 allowed=x,
                 request=MagicMock(spec=ClientBatchCheckItem,
-                                  object=f"doc:{i}"),
+                                  object=f"doc:{i}",
+                                  relation="viewer", user="user:jane",
+                                  context=None),
             )
             for i, x in enumerate(allowed_flags)
         ]
@@ -107,8 +113,12 @@ def test_get_relevant_docs(
     query = "test_query"
     run_manager = MagicMock()
     docs = [MagicMock(spec=Document, id=i) for i in range(doc_count)]
+    # Checks must carry their full identity (relation/object/user/context) so
+    # that each result correlates back to exactly one check. `context=None`
+    # mirrors a query builder that sets no condition parameters.
     mock_query_builder.side_effect = [
-        MagicMock(spec=ClientBatchCheckItem, object=f"doc:{i}")
+        MagicMock(spec=ClientBatchCheckItem, object=f"doc:{i}",
+                  relation="viewer", user="user:jane", context=None)
         for i in range(doc_count)
     ]
     mock_results = MagicMock(
@@ -116,7 +126,9 @@ def test_get_relevant_docs(
             MagicMock(
                 allowed=x,
                 request=MagicMock(spec=ClientBatchCheckItem,
-                                  object=f"doc:{i}"),
+                                  object=f"doc:{i}",
+                                  relation="viewer", user="user:jane",
+                                  context=None),
             )
             for i, x in enumerate(allowed_flags)
         ]

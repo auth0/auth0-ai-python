@@ -1,3 +1,4 @@
+import json
 import os
 
 from typing import Callable, Optional
@@ -9,6 +10,22 @@ from openfga_sdk import ClientConfiguration, OpenFgaClient
 from openfga_sdk.client.models import ClientBatchCheckItem
 from openfga_sdk.sync import OpenFgaClient as OpenFgaClientSync
 from openfga_sdk.credentials import CredentialConfiguration, Credentials
+
+
+def _check_key(check) -> tuple:
+    """
+    Build a complete, hashable identity for an FGA check.
+
+    Includes ``context`` (canonicalized with ``json.dumps(sort_keys=True)``,
+    which sorts keys at every depth and preserves all values) alongside
+    relation/object/user so that checks differing only by their condition
+    parameters are treated as distinct. Used as the single source of truth for
+    deduplication, the document-to-check mapping, and result correlation, so a
+    denied document can no longer inherit an allowed result.
+    """
+    context = getattr(check, "context", None)
+    context_key = json.dumps(context, sort_keys=True) if context else None
+    return (check.relation, check.object, check.user, context_key)
 
 
 class FGARetriever(BaseRetriever):
@@ -65,13 +82,10 @@ class FGARetriever(BaseRetriever):
         async with OpenFgaClient(self._fga_configuration) as fga_client:
             all_checks = [self._query_builder(doc) for doc in docs]
             unique_checks = list(
-                {
-                    (check.relation, check.object, check.user): check
-                    for check in all_checks
-                }.values()
+                {_check_key(check): check for check in all_checks}.values()
             )
 
-            doc_to_obj = {doc: check.object for check, doc in zip(all_checks, docs)}
+            doc_to_key = {doc: _check_key(check) for check, doc in zip(all_checks, docs)}
 
             fga_response = await fga_client.batch_check(
                 ClientBatchCheckRequest(checks=unique_checks)
@@ -79,14 +93,15 @@ class FGARetriever(BaseRetriever):
             await fga_client.close()
 
             permissions_map = {
-                result.request.object: result.allowed for result in fga_response.result
+                _check_key(result.request): result.allowed
+                for result in fga_response.result
             }
 
             return [
                 doc
                 for doc in docs
-                if doc_to_obj[doc] in permissions_map
-                and permissions_map[doc_to_obj[doc]]
+                if doc_to_key[doc] in permissions_map
+                and permissions_map[doc_to_key[doc]]
             ]
 
     async def _aget_relevant_documents(self, query, *, run_manager) -> list[Document]:
@@ -119,27 +134,27 @@ class FGARetriever(BaseRetriever):
         with OpenFgaClientSync(self._fga_configuration) as fga_client:
             all_checks = [self._query_builder(doc) for doc in docs]
             unique_checks = list(
-                {
-                    (check.relation, check.object, check.user): check
-                    for check in all_checks
-                }.values()
+                {_check_key(check): check for check in all_checks}.values()
             )
 
-            doc_to_obj = {doc.id: check.object for check, doc in zip(all_checks, docs)}
+            doc_to_key = {
+                doc.id: _check_key(check) for check, doc in zip(all_checks, docs)
+            }
 
             fga_response = fga_client.batch_check(
                 ClientBatchCheckRequest(checks=unique_checks)
             )
 
             permissions_map = {
-                result.request.object: result.allowed for result in fga_response.result
+                _check_key(result.request): result.allowed
+                for result in fga_response.result
             }
 
             return [
                 doc
                 for doc in docs
-                if doc_to_obj[doc.id] in permissions_map
-                and permissions_map[doc_to_obj[doc.id]]
+                if doc_to_key[doc.id] in permissions_map
+                and permissions_map[doc_to_key[doc.id]]
             ]
 
     def _get_relevant_documents(self, query, *, run_manager) -> list[Document]:
