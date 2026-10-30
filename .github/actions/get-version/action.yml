@@ -1,0 +1,29 @@
+name: Return the version from a .version file
+
+#
+# Returns the version from the .version file at the given path.
+#
+# TODO: Remove once the common repo is public.
+#
+
+inputs:
+  path:
+    description: Path to the .version file
+    required: false
+    default: .version
+
+outputs:
+  version:
+    value: ${{ steps.get_version.outputs.VERSION }}
+
+runs:
+  using: composite
+
+  steps:
+    - id: get_version
+      shell: bash
+      run: |
+        VERSION=$(head -1 "${VERSION_FILE}")
+        echo "VERSION=${VERSION}" >> $GITHUB_OUTPUT
+      env:
+        VERSION_FILE: ${{ inputs.path }}
