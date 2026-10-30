@@ -1,0 +1,57 @@
+name: SCA
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      scan: ${{ steps.detect.outputs.scan }}
+      exclude: ${{ steps.detect.outputs.exclude }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - id: detect
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "scan=true" >> "$GITHUB_OUTPUT"
+            echo "exclude=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed=$(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          scan=false
+          exclude=""
+          for dir in packages/*/ examples/*/; do
+            dir=${dir%/}
+            if grep -q "^$dir/" <<< "$changed"; then
+              scan=true
+            else
+              exclude="$exclude$(basename "$dir"),"
+            fi
+          done
+          echo "scan=$scan" >> "$GITHUB_OUTPUT"
+          echo "exclude=$exclude" >> "$GITHUB_OUTPUT"
+
+  snyk-cli:
+    needs: changes
+    if: needs.changes.outputs.scan == 'true'
+    uses: auth0/devsecops-tooling/.github/workflows/sca-scan.yml@main
+    with:
+      additional-arguments: "--all-projects --exclude=${{ needs.changes.outputs.exclude }}README.md,.jfrog --skip-unresolved"
+      python-version: "3.10"
+    secrets: inherit
