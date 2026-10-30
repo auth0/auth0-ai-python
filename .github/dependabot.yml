@@ -6,3 +6,11 @@ updates:
       - "/.github/actions/*"
     schedule:
       interval: "daily"
+
+  - package-ecosystem: "pip"
+    directory: "/packages/auth0-ai-mcp"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
