@@ -543,7 +543,7 @@ async def test_metadata_routes_need_a_token_for_methods_other_than_get(path):
 
 
 BUILDERS = [
-    lambda client: build_protected_resource_metadata(client),
+    build_protected_resource_metadata,
     lambda client: Auth0AsgiMiddleware(StubApp(), mcp_client=client),
 ]
 
