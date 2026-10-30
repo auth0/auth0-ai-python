@@ -11,8 +11,7 @@ on:
           - auth0-ai-mcp
 
 permissions:
-  contents: write
-  id-token: write # Required for trusted publishing to PyPI
+  contents: read
 
 env:
   PACKAGE: ${{ inputs.package }}
@@ -21,14 +20,17 @@ env:
 jobs:
   rl-scanner:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
 
       - name: Configure Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
@@ -70,10 +72,13 @@ jobs:
     runs-on: ubuntu-latest
     needs: rl-scanner
     environment: release
+    permissions:
+      contents: write
+      id-token: write # Required for trusted publishing to PyPI
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           fetch-tags: true
@@ -113,7 +118,7 @@ jobs:
           prerelease: ${{ steps.get_prerelease.outputs.prerelease }}
 
       - name: Configure Python
-        uses: actions/setup-python@v7
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.12"
 
@@ -132,6 +137,6 @@ jobs:
         run: poetry build
 
       - name: Publish release
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@7245906fb61fa33a13554f9d5fb856fe61758086 # v1.14.3
         with:
           packages-dir: ${{ env.PACKAGE_DIR }}/dist/
