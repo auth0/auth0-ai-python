@@ -1,0 +1,21 @@
+line-length = 100
+target-version = "py310"
+
+[lint]
+preview = true
+explicit-preview-rules = true  # only the preview rules selected below, such as PLC0415
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "S",   # bandit (security)
+    "PLC0415",  # import outside top level
+]
+ignore = ["E501", "B904"]  # Line too long, Exception handling without from
+
+[lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]  # Allow assert and ignore hardcoded password warnings in test files

@@ -1,0 +1,28 @@
+[tool.poetry]
+name = "auth0-ai-mcp"
+version = "1.0.0b0"
+description = "Auth0 authentication helpers for MCP servers, built on auth0-api-python."
+authors = ["Auth0 <support@auth0.com>"]
+license = "Apache-2.0"
+readme = "README.md"
+packages = [{ include = "auth0_ai_mcp", from = "src" }]
+
+[tool.poetry.dependencies]
+python = ">=3.10,<4.0"
+# Pinned by SHA until a core release includes the OBO, M2M and Token Vault caching, the malformed-token fix and client_info.
+auth0-api-python = { git = "https://github.com/auth0/auth0-api-python.git", rev = "1fe1a417e867d417b4bd44c5984fe002f11149f9" }
+starlette = ">=0.37.0"
+
+[tool.poetry.group.dev.dependencies]
+mcp = "^2.2.0"
+python-dotenv = "^1.2.3"
+pytest = "^9.0"
+pytest-asyncio = ">=0.23"
+ruff = ">=0.6"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
