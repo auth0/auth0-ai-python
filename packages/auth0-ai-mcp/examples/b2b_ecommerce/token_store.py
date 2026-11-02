@@ -1,6 +1,7 @@
 """In-memory token stores for the example.
 
-Tokens are lost on restart, so use a shared store in production.
+Tokens are lost on restart, and an expired entry is only dropped when its own key is read, so
+memory grows with each login. Fine for a demo, use a shared store with a TTL in production.
 """
 
 import time
@@ -45,7 +46,7 @@ class InMemoryIndexedTokenStore(InMemoryTokenStore, IndexedTokenStore):
 
     async def list_index_members(self, index_key: str) -> list[TokenIndexMember]:
         members = self._indexes.get(index_key, {})
-        # Drop expired members so the index does not grow forever.
+        # Drop this index's expired members before they are matched.
         now = int(time.time())
         for token_key in [k for k, m in members.items() if m["expires_at"] <= now]:
             del members[token_key]
