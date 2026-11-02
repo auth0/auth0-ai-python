@@ -9,8 +9,15 @@ from __future__ import annotations
 
 from auth0_api_python.errors import BaseAuthError
 
+try:
+    from mcp.server.mcpserver.exceptions import ToolError
+except ImportError:  # Without mcp there is no framework error to extend.
+    _TOOL_ERROR_BASES: tuple[type[Exception], ...] = ()
+else:
+    _TOOL_ERROR_BASES = (ToolError,)
 
-class UnauthenticatedError(BaseAuthError):
+
+class UnauthenticatedError(BaseAuthError, *_TOOL_ERROR_BASES):
     """No verified caller in the current request context. Raised inside the tool, so the framework reports it as a tool error."""
 
     def get_status_code(self) -> int:
@@ -20,7 +27,7 @@ class UnauthenticatedError(BaseAuthError):
         return "invalid_token"
 
 
-class InsufficientScopeError(BaseAuthError):
+class InsufficientScopeError(BaseAuthError, *_TOOL_ERROR_BASES):
     """The caller's token is missing a required scope. Raised inside the tool, so the framework reports it as a tool error."""
 
     def get_status_code(self) -> int:

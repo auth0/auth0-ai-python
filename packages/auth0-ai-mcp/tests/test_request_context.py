@@ -1,5 +1,7 @@
 """Tests for the request context binding and the get_caller_* accessors."""
 
+import asyncio
+
 import pytest
 
 from auth0_ai_mcp import (
@@ -33,6 +35,29 @@ def test_context_is_reset_after_normal_exit():
     with bind_request_context(_context()):
         pass
     assert get_caller_principal() is None
+
+
+def test_nested_bind_restores_the_outer_context_on_exit():
+    outer, inner = _context(), _context()
+    with bind_request_context(outer):
+        with bind_request_context(inner):
+            assert get_caller_principal() is inner.principal
+        assert get_caller_principal() is outer.principal
+    assert get_caller_principal() is None
+
+
+async def test_concurrent_tasks_each_see_their_own_context():
+    async def read_back(ctx):
+        with bind_request_context(ctx):
+            await asyncio.sleep(0)
+            return get_caller_principal()
+
+    first, second = _context(), _context()
+
+    seen = await asyncio.gather(read_back(first), read_back(second))
+
+    assert seen[0] is first.principal
+    assert seen[1] is second.principal
 
 
 def test_context_is_reset_after_an_exception():

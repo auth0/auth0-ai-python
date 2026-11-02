@@ -20,7 +20,7 @@ class Principal:
         expires_at: Unix epoch seconds the token expires, from the "exp" claim.
         scopes: Parsed from the space-separated "scope" claim. Empty list if absent.
         permissions: From the "permissions" claim. None when the claim is absent from
-            the token (RBAC not enabled on the API), a list (possibly empty) when present.
+            the token (RBAC is off, or the API does not add permissions to the access token), a list (possibly empty) when present.
         client_id: From the "azp" claim, falling back to "client_id". Always set, because a token with neither is rejected.
         org_id: From the "org_id" claim. None when the token carries no Organization.
     """

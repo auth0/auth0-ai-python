@@ -9,9 +9,12 @@ not receive an auth argument.
 from __future__ import annotations
 
 import functools
+import inspect
 import logging
 from collections.abc import Awaitable, Callable
 from typing import TypeVar
+
+from auth0_api_python.errors import ConfigurationError
 
 from .errors import InsufficientScopeError, UnauthenticatedError
 from .principal import Principal
@@ -31,7 +34,7 @@ def require_scopes(principal: Principal | None, scopes: str | list[str]) -> None
         scopes: A single required scope, or a list of scopes that must all be present.
 
     Raises:
-        ConfigurationError: If `scopes` is empty, blank, or holds a non-string or blank entry.
+        ConfigurationError: If `scopes` is empty, blank, or holds a non-string, blank or whitespace-containing entry.
         UnauthenticatedError: If `principal` is None.
         InsufficientScopeError: If the principal is missing any required scope.
     """
@@ -47,6 +50,8 @@ def require_scopes(principal: Principal | None, scopes: str | list[str]) -> None
 def with_required_scopes(scopes: str | list[str]) -> Callable[[F], F]:
     """Return a decorator that gates an async handler on the given scopes.
 
+    Put the framework's own registration decorator, such as `@mcp.tool()`, above this one. Registered the other way round, the framework keeps the unguarded function and the check is skipped.
+
     Args:
         scopes: A single required scope, or a list of scopes that must all be present.
 
@@ -54,11 +59,14 @@ def with_required_scopes(scopes: str | list[str]) -> Callable[[F], F]:
         A decorator that runs the scope check before the handler body.
 
     Raises:
-        ConfigurationError: At decoration time, if `scopes` is empty, blank, or holds a non-string or blank entry.
+        ConfigurationError: At decoration time, if `scopes` is empty, blank, or holds a non-string, blank or whitespace-containing entry, or if the decorated function is not async.
     """
     required = scope_input.normalize_scopes(scopes)
 
     def decorator(func: F) -> F:
+        if not inspect.iscoroutinefunction(func):
+            raise ConfigurationError("with_required_scopes can only gate an async function")
+
         @functools.wraps(func)
         async def wrapper(*args: object, **kwargs: object) -> object:
             require_scopes(get_caller_principal(), required)

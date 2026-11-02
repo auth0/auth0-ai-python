@@ -7,7 +7,12 @@ import time
 
 import pytest
 from auth0_api_python import ApiClient, ApiClientOptions, VerifiedToken
-from auth0_api_python.errors import ApiError, ConfigurationError, GetTokenByExchangeProfileError
+from auth0_api_python.errors import (
+    ApiError,
+    ConfigurationError,
+    GetTokenByExchangeProfileError,
+    VerifyAccessTokenError,
+)
 
 from auth0_ai_mcp import (
     AbstractTokenStore,
@@ -52,7 +57,9 @@ class StubApiClient:
         raises=None,
         cc_scope_response=None,
         expires_at_override=_KEEP,
+        claims=None,
     ):
+        self.claims = claims
         self.granted_scope = granted_scope
         self.include_scope = include_scope
         self.expires_at = expires_at if expires_at is not None else int(time.time()) + 3600
@@ -70,6 +77,8 @@ class StubApiClient:
         self.last_connection_options = None
 
     async def verify_access_token(self, access_token: str):
+        if self.claims is not None:
+            return self.claims
         return {"sub": "user_1", "exp": int(time.time()) + 3600, "scope": "mcp:use"}
 
     async def get_token_on_behalf_of(self, access_token, audience, scope=None, *, verified=None):
@@ -166,6 +175,23 @@ async def test_verify_access_token_returns_verified_token_carrying_the_original_
     verified = await client.verify_access_token("the.raw.token")
 
     assert verified.access_token == "the.raw.token"
+    assert verified.claims["sub"] == "user_1"
+
+
+@pytest.mark.parametrize("cnf", [{"jkt": "thumbprint"}, {"x5t#S256": "thumbprint"}, {"jkt": ""}, "not-a-dict"])
+async def test_verify_access_token_rejects_a_sender_constrained_token(cnf):
+    client = McpServerClient(StubApiClient(claims={"sub": "user_1", "cnf": cnf}))
+
+    with pytest.raises(VerifyAccessTokenError):
+        await client.verify_access_token("the.raw.token")
+
+
+@pytest.mark.parametrize("cnf", [{}, None])
+async def test_verify_access_token_accepts_an_empty_cnf_claim(cnf):
+    client = McpServerClient(StubApiClient(claims={"sub": "user_1", "cnf": cnf}))
+
+    verified = await client.verify_access_token("the.raw.token")
+
     assert verified.claims["sub"] == "user_1"
 
 
@@ -360,8 +386,9 @@ async def test_request_scoped_get_token_on_behalf_of_forwards_scope_and_verified
     verified = _verified()
     scoped = RequestScopedMcpClient(McpServerClient(api), verified, _principal())
 
-    await scoped.get_token_on_behalf_of(audience="https://orders/", scope="cancel:orders")
+    result = await scoped.get_token_on_behalf_of(audience="https://orders/", scope="cancel:orders")
 
+    assert result["access_token"] == "downstream-for-https://orders/"
     assert api.last_scope == "cancel:orders"
     assert api.last_access_token == verified.access_token
     assert api.last_verified is verified
@@ -434,6 +461,7 @@ def test_create_mcp_client_forwards_org_policy_to_core():
         organization_policy="required",
         organization_id="org_abc",
     )
+    assert client.audience == "https://api/"
     assert client._api.options.organization_policy == "required"
     assert client._api.options.organization_id == "org_abc"
 

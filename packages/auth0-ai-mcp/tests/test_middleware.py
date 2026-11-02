@@ -10,6 +10,7 @@ import pytest
 from auth0_api_python.errors import (
     AuthServerUnavailableError,
     ConfigurationError,
+    DomainsResolverError,
     VerifyAccessTokenError,
 )
 from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
@@ -138,6 +139,25 @@ async def test_missing_bearer_token_returns_401_and_skips_app():
     assert api.verified_tokens == []
 
 
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("GET", "/mcp"),
+        ("DELETE", "/mcp"),
+        ("GET", "/.well-known/oauth-protected-resource/other"),
+    ],
+)
+async def test_missing_bearer_token_returns_401_for_other_methods_and_paths(method, path):
+    app = StubApp()
+    api = StubApiClient(claims=_claims())
+
+    sent = await _call(_middleware(app, api), _scope(path=path, method=method))
+
+    assert _status(sent) == 401
+    assert app.calls == 0
+    assert api.verified_tokens == []
+
+
 async def test_non_bearer_authorization_header_is_treated_as_missing():
     app = StubApp()
 
@@ -183,6 +203,20 @@ async def test_challenge_uses_root_metadata_url_when_resource_has_no_path():
 
     assert _header(sent, b"www-authenticate") == (
         b'Bearer resource_metadata="https://mcp.example/.well-known/oauth-protected-resource"'
+    )
+
+
+async def test_challenge_keeps_the_port_of_the_resource_url():
+    middleware = Auth0AsgiMiddleware(
+        StubApp(),
+        mcp_client=McpServerClient(StubApiClient(claims=_claims(), audience="http://localhost:3002/mcp")),
+    )
+
+    sent = await _call(middleware, _scope())
+
+    assert _status(sent) == 401
+    assert b'resource_metadata="http://localhost:3002/.well-known/oauth-protected-resource/mcp"' in _header(
+        sent, b"www-authenticate"
     )
 
 
@@ -238,12 +272,23 @@ async def test_invalid_token_gets_a_fixed_description_and_the_reason_is_only_log
     assert "secret-tok" not in caplog.text
 
 
+async def test_rejection_reason_is_escaped_in_the_log(caplog):
+    api = StubApiClient(raises=VerifyAccessTokenError("bad\r\nERROR forged record"))
+
+    with caplog.at_level(logging.WARNING, logger="auth0_ai_mcp.middleware"):
+        sent = await _call(_middleware(StubApp(), api), _scope(headers=_bearer("tok")))
+
+    assert _status(sent) == 401
+    assert "\r" not in caplog.text
+    assert "\\r\\nERROR forged record" in caplog.text
+
+
 async def test_unreachable_auth_server_returns_503_without_a_challenge_and_skips_app(caplog):
     app = StubApp()
     api = StubApiClient(raises=AuthServerUnavailableError("Failed to fetch JWKS"))
 
     with caplog.at_level(logging.ERROR, logger="auth0_ai_mcp.middleware"):
-        sent = await _call(_middleware(app, api), _scope(headers=_bearer("tok")))
+        sent = await _call(_middleware(app, api), _scope(headers=_bearer("secret-tok")))
 
     assert _status(sent) == 503
     assert _header(sent, b"retry-after") == b"5"
@@ -251,6 +296,45 @@ async def test_unreachable_auth_server_returns_503_without_a_challenge_and_skips
     assert _body(sent)["error"]["code"] == -32002
     assert "Failed to fetch JWKS" not in json.dumps(_body(sent))
     assert "Failed to fetch JWKS" in caplog.text
+    assert "secret-tok" not in caplog.text
+    assert app.calls == 0
+
+
+async def test_unreachable_auth_server_reason_is_escaped_in_the_log(caplog):
+    api = StubApiClient(raises=AuthServerUnavailableError("bad\r\nERROR forged record"))
+
+    with caplog.at_level(logging.ERROR, logger="auth0_ai_mcp.middleware"):
+        sent = await _call(_middleware(StubApp(), api), _scope(headers=_bearer("tok")))
+
+    assert _status(sent) == 503
+    assert "\r" not in caplog.text
+    assert "\\r\\nERROR forged record" in caplog.text
+
+
+async def test_failing_domains_resolver_returns_503_without_a_challenge_and_skips_app(caplog):
+    app = StubApp()
+    api = StubApiClient(raises=DomainsResolverError("resolver\r\nERROR forged record"))
+
+    with caplog.at_level(logging.WARNING, logger="auth0_ai_mcp.middleware"):
+        sent = await _call(_middleware(app, api), _scope(headers=_bearer("secret-tok")))
+
+    assert _status(sent) == 503
+    assert _header(sent, b"www-authenticate") is None
+    assert "resolver" not in json.dumps(_body(sent))
+    assert "\r" not in caplog.text
+    assert "\\r\\nERROR forged record" in caplog.text
+    assert "secret-tok" not in caplog.text
+    assert app.calls == 0
+
+
+async def test_dpop_bound_token_returns_401_and_skips_app():
+    app = StubApp()
+    api = StubApiClient(claims={**_claims(), "cnf": {"jkt": "thumbprint"}})
+
+    sent = await _call(_middleware(app, api), _scope(headers=_bearer("tok")))
+
+    assert _status(sent) == 401
+    assert 'error="invalid_token"' in _header(sent, b"www-authenticate").decode()
     assert app.calls == 0
 
 

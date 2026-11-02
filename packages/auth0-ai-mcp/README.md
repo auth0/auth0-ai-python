@@ -29,7 +29,13 @@ Or with Poetry:
 poetry add auth0-ai-mcp
 ```
 
-Python 3.10 or later is required.
+Python 3.10 or later is required. The examples below use the official `mcp` SDK, so install it with the `mcp` extra:
+
+```bash
+pip install "auth0-ai-mcp[mcp]"
+```
+
+The snippets use the 2.x import `mcp.server.mcpserver` and were tested with `mcp` 2.3.
 
 ### 2. Build the client
 
@@ -54,20 +60,30 @@ client = create_mcp_client(
 The ASGI adapter wraps any ASGI app and handles all auth work before the MCP handler runs:
 
 ```python
+from mcp.server.mcpserver import MCPServer
+from mcp.server.transport_security import TransportSecuritySettings
+
 from auth0_ai_mcp.middleware import Auth0AsgiMiddleware
 
+mcp = MCPServer("weather")
+
 secured_app = Auth0AsgiMiddleware(
-    app,
+    mcp.streamable_http_app(
+        transport_security=TransportSecuritySettings(allowed_hosts=["your-mcp-server", "your-mcp-server:*"]),
+    ),
     mcp_client=client,
+    scopes_supported=["read:weather"],
 )
 ```
 
+The `mcp` SDK only accepts requests for `127.0.0.1`, `localhost` and `::1` by default, so list your public host in `allowed_hosts`, with and without a port, or every request gets a `421`. `scopes_supported` is advertised in the metadata, so clients know to request the scopes your tools need. Without it a client may ask for no scope and every gated tool fails.
 
 ### 4. Write a gated tool
 
 ```python
 from auth0_ai_mcp import require_caller_mcp_client, with_required_scopes
 
+@mcp.tool()
 @with_required_scopes("read:weather")
 async def get_weather(location: str) -> dict:
     auth0 = require_caller_mcp_client()
@@ -76,9 +92,10 @@ async def get_weather(location: str) -> dict:
         scope="read:weather",
     )
     # call the downstream API with token["access_token"]
+    ...
 ```
 
-`with_required_scopes` raises before the tool body runs if the caller's token is missing a listed scope. `require_caller_mcp_client` reads the request-scoped client from the `contextvar` set by the adapter.
+`with_required_scopes` raises before the tool body runs if the caller's token is missing a listed scope. Keep `@mcp.tool()` as the top decorator. If it sits below, the framework registers the unguarded function and the check is skipped. `require_caller_mcp_client` reads the request-scoped client from the `contextvar` set by the adapter.
 
 ## Feedback
 

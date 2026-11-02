@@ -17,6 +17,7 @@ from urllib.parse import urlsplit
 
 from auth0_api_python.errors import (
     AuthServerUnavailableError,
+    DomainsResolverError,
     VerifyAccessTokenError,
 )
 from starlette.authentication import AuthCredentials
@@ -163,11 +164,15 @@ class Auth0AsgiMiddleware:
             verified = await self._client.verify_access_token(token)
             principal = build_principal(verified.claims)
         except AuthServerUnavailableError as exc:
-            logger.error("Auth0 could not be reached to verify the token: %s", exc)
+            logger.error("Auth0 could not be reached to verify the token: %r", str(exc))
+            await self._send_unavailable(send)
+            return
+        except DomainsResolverError as exc:
+            logger.warning("The domains resolver failed while verifying the token: %r", str(exc))
             await self._send_unavailable(send)
             return
         except VerifyAccessTokenError as exc:
-            logger.warning("Token rejected: %s", exc)
+            logger.warning("Token rejected: %r", str(exc))
             await self._send_unauthorized(send, error="invalid_token")
             return
 

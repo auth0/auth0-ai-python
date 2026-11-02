@@ -22,6 +22,7 @@ from auth0_api_python import (
 from auth0_api_python.errors import (
     ConfigurationError,
     GetTokenByExchangeProfileError,
+    VerifyAccessTokenError,
 )
 
 from .principal import Principal
@@ -53,8 +54,15 @@ class McpServerClient:
         return RequestScopedMcpClient(self, verified, principal)
 
     async def verify_access_token(self, access_token: str) -> VerifiedToken:
-        """Verify the incoming token, returning it paired with its verified claims."""
+        """Verify the incoming token, returning it paired with its verified claims.
+
+        Raises:
+            VerifyAccessTokenError: If the token is invalid, or is bound to a DPoP key or a client certificate (it has a `cnf` claim) and so cannot be used as a Bearer token.
+            AuthServerUnavailableError: If the OIDC discovery document or JWKS cannot be reached.
+        """
         claims = await self._api.verify_access_token(access_token=access_token)
+        if claims.get("cnf"):
+            raise VerifyAccessTokenError("Sender-constrained token cannot be used as a Bearer token")
         return VerifiedToken(access_token=access_token, claims=claims)
 
     async def get_token_on_behalf_of(
@@ -67,8 +75,9 @@ class McpServerClient:
         """Exchange the caller's token for a downstream token for the given audience and scope.
 
         Raises:
+            ApiError: If the token endpoint is unreachable, times out, or returns an error.
             DownscopedTokenError: If the exchange grants fewer scopes than were requested.
-            GetTokenByExchangeProfileError: If the exchanged token is already expired.
+            GetTokenByExchangeProfileError: If client credentials are not configured or the exchanged token is already expired.
         """
         result = await self._api.get_token_on_behalf_of(
             verified.access_token, audience, scope, verified=verified
@@ -87,8 +96,8 @@ class McpServerClient:
             scope: Optional space-separated scopes to request.
 
         Raises:
-            GetClientCredentialsTokenError: If client credentials are not configured, the token endpoint is unreachable, or the returned token is already expired.
-            ApiError: If the token endpoint returns an error.
+            GetClientCredentialsTokenError: If client credentials are not configured or the returned token is already expired.
+            ApiError: If the token endpoint is unreachable, times out, or returns an error.
             DownscopedTokenError: If the token endpoint grants fewer scopes than were requested.
         """
         result = await self._api.get_client_credentials_token(audience=audience, scope=scope)
@@ -108,11 +117,11 @@ class McpServerClient:
         Args:
             verified: The verified incoming token for the requesting user.
             connection: The Auth0 federated connection identifier (e.g. "google-oauth2").
-            login_hint: Optional email to pre-fill the federated login prompt.
+            login_hint: Optional value that selects which linked account to use when the user has several linked accounts on this connection.
 
         Raises:
-            GetAccessTokenForConnectionError: If client credentials are not configured, the exchange fails, or the returned token is already expired.
-            ApiError: If the token exchange endpoint returns an error.
+            GetAccessTokenForConnectionError: If client credentials are not configured or the returned token is already expired.
+            ApiError: If the token exchange endpoint is unreachable, times out, or returns an error.
         """
         options: dict = {
             "connection": connection,

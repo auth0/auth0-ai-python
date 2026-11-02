@@ -67,6 +67,13 @@ def test_build_principal_missing_scope_claim_yields_empty_list():
     assert principal.scopes == []
 
 
+@pytest.mark.parametrize("claim", [{"permissions": ["read:x"]}, {"scp": ["read:x"]}])
+def test_build_principal_ignores_other_claims_when_scope_is_missing(claim):
+    claims = {"sub": "auth0|user123", "exp": int(time.time()) + 3600, "azp": "spa_client_id", **claim}
+
+    assert build_principal(claims).scopes == []
+
+
 _ABSENT = object()
 
 

@@ -1,13 +1,22 @@
 """Tests for require_scopes and the with_required_scopes decorator."""
 
+import importlib.util
 import inspect
+import sys
 
 import pytest
-from auth0_api_python.errors import ConfigurationError
+from auth0_api_python.errors import BaseAuthError, ConfigurationError
+from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError, UnexpectedToolError
 
-from auth0_ai_mcp import Principal
+from auth0_ai_mcp import Principal, errors
 from auth0_ai_mcp.errors import InsufficientScopeError, UnauthenticatedError
-from auth0_ai_mcp.request_context import RequestContext, reset_request_context, set_request_context
+from auth0_ai_mcp.request_context import (
+    RequestContext,
+    bind_request_context,
+    reset_request_context,
+    set_request_context,
+)
 from auth0_ai_mcp.scopes import require_scopes, with_required_scopes
 
 
@@ -48,6 +57,15 @@ def test_raises_insufficient_scope_when_any_required_scope_is_missing(required):
     assert exc_info.value.get_error_code() == "insufficient_scope"
 
 
+@pytest.mark.parametrize(
+    ("granted", "required"),
+    [("read:x:all", "read:x"), ("READ:X", "read:x"), ("read:x", "read:x:all")],
+)
+def test_a_scope_that_only_looks_like_the_required_one_does_not_satisfy_the_check(granted, required):
+    with pytest.raises(InsufficientScopeError):
+        require_scopes(_principal([granted]), required)
+
+
 def test_scope_held_only_as_a_permission_does_not_satisfy_the_check():
     principal = Principal(
         sub="u1", expires_at=9999999999, scopes=[], permissions=["read:x"], client_id="client_1", org_id=None
@@ -75,6 +93,14 @@ def test_raises_unauthenticated_when_principal_is_none():
 def test_rejects_empty_or_malformed_scopes(scopes: object):
     with pytest.raises(ConfigurationError):
         require_scopes(_principal(["read:x"]), scopes)  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("scopes", ["read:a write:a", "read:a ", ["read:a", "write:a read:b"]])
+def test_rejects_a_scope_that_contains_whitespace(scopes: object):
+    with pytest.raises(ConfigurationError):
+        require_scopes(_principal(["read:a"]), scopes)  # type: ignore[arg-type]
+    with pytest.raises(ConfigurationError):
+        with_required_scopes(scopes)  # type: ignore[arg-type]
 
 
 @pytest.mark.parametrize(("required", "held"), [("read:x", ["read:x"]), (["read:x", "write:y"], ["read:x", "write:y"])])
@@ -131,6 +157,14 @@ def test_rejects_empty_or_malformed_scopes_at_decoration_time(scopes: object):
         with_required_scopes(scopes)  # type: ignore[arg-type]
 
 
+def test_rejects_a_sync_function_at_decoration_time():
+    def sync_tool() -> str:
+        return "ran"
+
+    with pytest.raises(ConfigurationError):
+        with_required_scopes("read:x")(sync_tool)  # type: ignore[type-var]
+
+
 async def test_raises_unauthenticated_when_no_context_is_set():
     # Do not set any context. The contextvar defaults to None.
     @with_required_scopes("read:x")
@@ -150,3 +184,57 @@ def test_decorated_handler_keeps_its_name_doc_and_signature():
     assert handler.__name__ == "handler"
     assert handler.__doc__ == "Handler doc."
     assert list(inspect.signature(handler).parameters) == ["a", "b"]
+
+
+async def test_denied_tool_reaches_the_client_as_a_tool_error_with_the_reason():
+    mcp = MCPServer("test")
+
+    @mcp.tool()
+    @with_required_scopes("read:x")
+    async def guarded() -> str:
+        return "body"
+
+    with bind_request_context(_make_context(_principal(["other"]))):
+        with pytest.raises(ToolError) as exc_info:
+            await mcp.call_tool("guarded", {})
+
+    assert not isinstance(exc_info.value, UnexpectedToolError)
+    assert "Missing one or more required scopes." in str(exc_info.value)
+    assert isinstance(exc_info.value.__cause__, InsufficientScopeError)
+
+
+async def test_tool_without_a_caller_reaches_the_client_as_a_tool_error_with_the_reason():
+    mcp = MCPServer("test")
+
+    @mcp.tool()
+    @with_required_scopes("read:x")
+    async def guarded() -> str:
+        return "body"
+
+    with pytest.raises(ToolError) as exc_info:
+        await mcp.call_tool("guarded", {})
+
+    assert not isinstance(exc_info.value, UnexpectedToolError)
+    assert "No principal in the current request context." in str(exc_info.value)
+    assert isinstance(exc_info.value.__cause__, UnauthenticatedError)
+
+
+@pytest.mark.parametrize("error", [InsufficientScopeError, UnauthenticatedError])
+def test_in_tool_errors_are_both_auth_errors_and_tool_errors(error):
+    exc = error("denied")
+
+    assert isinstance(exc, BaseAuthError)
+    assert isinstance(exc, ToolError)
+    assert str(exc) == "denied"
+    assert exc.get_status_code() in (401, 403)
+
+
+def test_in_tool_errors_stay_auth_errors_when_mcp_is_not_installed(monkeypatch):
+    monkeypatch.setitem(sys.modules, "mcp.server.mcpserver.exceptions", None)
+    spec = importlib.util.spec_from_file_location("errors_without_mcp", errors.__file__)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+
+    for error in (module.InsufficientScopeError, module.UnauthenticatedError):
+        assert issubclass(error, BaseAuthError)
+        assert not issubclass(error, ToolError)
