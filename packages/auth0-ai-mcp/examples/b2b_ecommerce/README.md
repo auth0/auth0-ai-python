@@ -70,8 +70,9 @@ Here is what happens behind those few lines.
   scopes Auth0 actually granted. If Auth0 grants fewer scopes than the tool asked for, the call
   raises, so a tool never quietly runs with too little access. Reusing a cached token is safe
   for the same reason, because its scopes are checked again every time.
-- `with_required_scopes` checks the caller's scopes before the tool body runs and raises
-  `insufficient_scope` if one is missing.
+- `with_required_scopes` checks the caller's scopes before the tool body runs. If one is
+  missing, the tool call fails with `Missing one or more required scopes.` and the tool body
+  does not run.
 
 You can leave out `scope` on a `get_token_on_behalf_of` call. Auth0 then returns a token with no
 `scope`, and in `non_strict` mode such a call never reuses a cached token.
@@ -105,11 +106,28 @@ app = Auth0AsgiMiddleware(
 The middleware takes the advertised resource and the Auth0 login server from `mcp_client`, so `AUTH0_AUDIENCE` and `AUTH0_DOMAIN` are the only values to set. Here it wraps the MCP SDK's streamable-HTTP app. `Auth0AsgiMiddleware` is plain ASGI
 middleware, so a FastAPI or Starlette app can be wrapped the same way.
 
+The `host` argument of `streamable_http_app` is not the address the server binds to. It only
+tells the MCP SDK to allow the `localhost` Host header, so a request that arrives under a public
+URL gets a `421`. Any other value, such as `0.0.0.0`, turns that check off. For a public URL,
+pass the allowed host and origin yourself.
+
+```python
+from mcp.server.transport_security import TransportSecuritySettings
+
+mcp.streamable_http_app(
+    transport_security=TransportSecuritySettings(
+        allowed_hosts=["mcp.example.com", "mcp.example.com:*"],
+        allowed_origins=["https://mcp.example.com"],
+    ),
+)
+```
+
 ## The OBO token cache
 
 Every `get_token_on_behalf_of` call swaps the user's token for a service token at Auth0, which
 costs a network round trip. With a cache, the SDK keeps each token it gets and hands it back the
-next time a tool asks for the same user, service and scopes. Caching is on when you pass a
+next time a tool asks for the same service and scopes with the same user access token. A new
+login gives a new access token, so it starts with an empty cache. Caching is on when you pass a
 `token_store` to `create_mcp_client`, and off without one. This example keeps tokens in memory
 (`token_store.py`), so a restart loses them. [Token Caching](../../docs/TokenCaching.md) explains what a shared,
 production store needs.
@@ -135,7 +153,7 @@ the commands say `YOUR_...`.
 > command below. Log in once like this before you start.
 >
 > ```bash
-> auth0 login --scopes create:client_grants,create:organization_clients
+> auth0 login --scopes create:client_grants,create:organization_clients,create:organization_members,update:tenant_settings,update:connections
 > ```
 >
 > If a command still fails with `access token lacks scope: <scope>`, run
@@ -184,7 +202,13 @@ auth0 api post clients --data '{
 A Regular Web App will not work here. Trying it fails with
 `This client is not a resource server and cannot exchange access tokens`.
 
-Next, turn on the OBO exchange for that client, using its id from the create output.
+The create output includes the client id. Auth0 CLI v1.38.0 and later remove `client_secret` from
+`auth0 api` output, so read the secret for `OBO_CLIENT_SECRET` with
+`auth0 api get "clients/YOUR_OBO_CLIENT_ID" --reveal-secrets`.
+
+Next, turn on the OBO exchange for that client. OBO token exchange must be enabled on the
+exchange client, as described in the
+[Auth0 On-Behalf-Of token exchange docs](https://auth0.com/docs/secure/call-apis-on-users-behalf/on-behalf-of-token-exchange).
 
 ```bash
 auth0 api patch "clients/YOUR_OBO_CLIENT_ID" \
@@ -207,8 +231,8 @@ If these fail with `access token lacks scope: create:client_grants`, the CLI is 
 login scopes from the top of [What you need on the tenant](#what-you-need-on-the-tenant). Log
 in again with them and rerun the grants.
 
-Last, let the OBO client get tokens for the downstream APIs without showing the user a consent
-screen. Run this on each downstream API with its id.
+Last, allow the OBO client to swap tokens for each downstream API without user consent. The
+swap is refused with a `400` unless this is on. Run this on each downstream API with its id.
 
 ```bash
 auth0 api patch "resource-servers/YOUR_ORDERS_API_ID"        --data '{"skip_consent_for_verifiable_first_party_clients":true}'
@@ -247,9 +271,23 @@ the register output.
 auth0 api post client-grants --data '{"client_id":"YOUR_TPC_CLIENT_ID","audience":"http://localhost:3002/mcp","scope":["tool:cancel_and_refund_order","tool:fulfill_order","tool:order_status_report","tool:update_customer_and_notify","tool:sales_analytics_report"],"subject_type":"user"}'
 ```
 
-This grant is easy to forget. Without it the login goes through but every tool call fails with
-`Client ... is not authorized to access resource server YOUR_MCP_AUDIENCE`. Third-party
-(`tpc_`) clients never get an API's allow-all access, so they always need their own grant.
+This grant is easy to forget. Without it the login never starts. Auth0 shows an error page with
+`invalid_request: Client "YOUR_TPC_CLIENT_ID" is not authorized to access resource server "YOUR_MCP_AUDIENCE"`,
+so Claude Code never gets a token. Third-party (`tpc_`) clients never get an API's allow-all
+access, so they always need their own grant.
+
+Two more tenant settings are needed for the Claude Code login. The resource parameter profile
+must be `compatibility`, which is off by default, and the connection your test user signs in
+with must be domain-level, because a `tpc_` client only sees domain-level connections.
+
+```bash
+auth0 api patch "tenants/settings" --data '{"resource_parameter_profile":"compatibility"}'
+auth0 api get connections
+auth0 api patch "connections/YOUR_CONNECTION_ID" --data '{"is_domain_connection":true}'
+```
+
+The profile is a tenant-wide setting, so run these on a development tenant and test your other
+applications afterwards.
 
 ### 4. Set up the analytics API for the M2M tool
 
@@ -339,16 +377,18 @@ return. These are the steps.
    auth0 api post client-grants --data '{"client_id":"YOUR_OBO_CLIENT_ID","audience":"https://returns.api/","scope":["read:returns","write:returns"],"subject_type":"user"}'
    ```
 
-3. Let the OBO client skip consent on the new API.
+3. Allow token swaps on the new API without user consent.
 
    ```bash
    auth0 api patch "resource-servers/YOUR_RETURNS_API_ID" --data '{"skip_consent_for_verifiable_first_party_clients":true}'
    ```
 
-4. Add the tool's scope to the MCP API.
+4. Add the tool's scope to the MCP API. A PATCH replaces the whole `scopes` list, so read the
+   current list and send it back with the new scope added.
 
    ```bash
-   auth0 api patch "resource-servers/YOUR_MCP_API_ID" --data '{"scopes":[{"value":"tool:process_return","description":"Process a return"}]}'
+   SCOPES=$(auth0 api get "resource-servers/YOUR_MCP_API_ID?fields=scopes" | jq -c '.scopes + [{"value":"tool:process_return","description":"Process a return"}]')
+   auth0 api patch "resource-servers/YOUR_MCP_API_ID" --data "{\"scopes\":$SCOPES}"
    ```
 
 5. Update the `tpc_` client's grant to include the new scope. The new scope list replaces the
@@ -410,8 +450,11 @@ without `organization_usage` set to `allow` is refused with a `400` and
 **2. Add your test user to the organization.**
 
 ```bash
-auth0 orgs members add YOUR_ORG_ID --user-id YOUR_USER_ID
+auth0 api post "organizations/YOUR_ORG_ID/members" --data '{"members":["YOUR_USER_ID"]}'
 ```
+
+Keep the quotes, because a user id contains a `|`. The call returns no body, so check it with
+`auth0 orgs members list YOUR_ORG_ID`.
 
 **3. Make the Claude Code client require an organization at login.**
 
@@ -457,6 +500,20 @@ auth0 api patch "client-grants/YOUR_GRANT_ID" \
 # find the grant id: auth0 api get "client-grants?client_id=YOUR_TPC_CLIENT_ID&audience=YOUR_AUDIENCE"
 ```
 
+### A tool call returns `Error executing tool ...`
+
+The client only sees this short message, so read the reason in the server terminal. It is
+usually one of these.
+
+- A scope is missing. The message is `Error executing tool X: Missing one or more required scopes.`
+- Auth0 refused the token swap, for example `Client "YOUR_OBO_CLIENT_ID" is not authorized to access resource server ...`
+  because the OBO client has no grant for that service. The client message is only
+  `Error executing tool X`.
+- Auth0 granted fewer scopes than the tool asked for.
+
+A token keeps the scopes it was issued with, so after you change a grant or `TOOL_SCOPES`, log
+in again with `/mcp`.
+
 ### Every request gets a 401
 
 Make sure the identifier of the MCP server's API in Auth0 is exactly `AUTH0_AUDIENCE`, and that
@@ -489,6 +546,9 @@ behind the scenes the server swaps your one token for an orders token and a paym
 The fulfill and status prompts use the token cache. The analytics prompt is
 the M2M tool, so it runs without your token. The repeated status report comes straight from the
 cache.
+
+The cache is kept per access token, not per user, so a new login starts with an empty cache. To
+see the swaps, count the `POST .../oauth/token` lines in the server log.
 
 To try org mode, set `AUTH0_ORGANIZATION_ID`, restart the server and run the first prompt again.
 [Running in B2B org mode](#running-in-b2b-org-mode) has the setup.

@@ -24,6 +24,12 @@ AUDIENCE = os.environ["AUTH0_AUDIENCE"]
 ORGANIZATION_ID = os.environ.get("AUTH0_ORGANIZATION_ID") or None
 SCOPE_MATCHING = os.environ.get("SCOPE_MATCHING", "strict")
 TOKEN_STORE_SECRET = os.environ["TOKEN_STORE_SECRET"]
+OBO_CLIENT_ID = os.environ.get("OBO_CLIENT_ID")
+OBO_CLIENT_SECRET = os.environ.get("OBO_CLIENT_SECRET")
+
+# Fail at startup, otherwise the first tool call fails with a generic "Error executing tool".
+if not OBO_CLIENT_ID or not OBO_CLIENT_SECRET:
+    raise SystemExit("Set OBO_CLIENT_ID and OBO_CLIENT_SECRET in .env, see step 2 of the README.")
 
 # Advertised in the RFC 9728 metadata so the MCP client requests them at login.
 TOOL_SCOPES = [
@@ -43,8 +49,8 @@ store = store_class(secret=TOKEN_STORE_SECRET)
 mcp_client = create_mcp_client(
     DOMAIN,
     AUDIENCE,
-    client_id=os.environ["OBO_CLIENT_ID"],
-    client_secret=os.environ["OBO_CLIENT_SECRET"],
+    client_id=OBO_CLIENT_ID,
+    client_secret=OBO_CLIENT_SECRET,
     token_store=store,
     scope_matching=SCOPE_MATCHING,
     organization_policy="required" if ORGANIZATION_ID else "allow",
@@ -58,6 +64,7 @@ from tools import register_tools  # noqa: E402
 register_tools(mcp)
 
 # Wrap the streamable-HTTP app so every request is verified before it reaches a tool.
+# host only sets the MCP SDK's Host/Origin allowlist, not the bind address. See the README for a public URL.
 app = Auth0AsgiMiddleware(
     mcp.streamable_http_app(host="127.0.0.1"),
     mcp_client=mcp_client,
