@@ -24,7 +24,7 @@ app = Auth0AsgiMiddleware(
 > [!WARNING]
 > The MCP SDK checks the Host and Origin headers when `streamable_http_app(host=...)` is `127.0.0.1`, `localhost` or `::1`, which is also the default. Any other value, such as `"0.0.0.0"`, turns the checks off.
 
-For a public URL, keep the checks on and list your host. Without this every request to a public host gets a `421`.
+For a public URL, keep the checks on and list your host. Without this every request to a public host gets a `421`. A request with an `Origin` header that is not in `allowed_origins` gets a `403`, so list the origins of any browser client there.
 
 ```python
 from mcp.server.transport_security import TransportSecuritySettings
@@ -56,7 +56,7 @@ verified = await mcp_client.verify_access_token(token)
 principal = build_principal(verified.claims)
 ```
 
-A failed verification raises `VerifyAccessTokenError`, and `build_principal` raises it too for claims it rejects. Catch it, log the real reason, and return a `401` built with `build_www_authenticate(resource_metadata_url, "invalid_token", "The access token is not valid")`. The real reason is not echoed to the client. `AuthServerUnavailableError` is a subclass that means Auth0 could not be reached, so catch it first and return a `503` without a challenge. A `401` would make the client log in again for no reason.
+A failed verification raises `VerifyAccessTokenError`, and `build_principal` raises it too for claims it rejects. Catch it, log the real reason, and return a `401` built with `build_www_authenticate(resource_metadata_url, "invalid_token", "The access token is not valid")`. The real reason is not echoed to the client. `AuthServerUnavailableError` is a subclass that means Auth0 could not be reached, so catch it first and return a `503` without a challenge. `DomainsResolverError` is not a `VerifyAccessTokenError`, so catch it separately and return the same `503`. A `401` would make the client log in again for no reason.
 
 ### 3. Build and set the request context
 

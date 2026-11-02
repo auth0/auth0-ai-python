@@ -76,7 +76,7 @@ secured_app = Auth0AsgiMiddleware(
 )
 ```
 
-The `mcp` SDK only accepts requests for `127.0.0.1`, `localhost` and `::1` by default, so list your public host in `allowed_hosts`, with and without a port, or every request gets a `421`. `scopes_supported` is advertised in the metadata, so clients know to request the scopes your tools need. Without it a client may ask for no scope and every gated tool fails.
+The `mcp` SDK only accepts requests for `127.0.0.1`, `localhost` and `::1` by default, and only with a port, so list your public host in `allowed_hosts`, with and without a port, or every request gets a `421`. A browser request whose `Origin` is not in `allowed_origins` gets a `403`. `scopes_supported` is advertised in the metadata, so clients know to request the scopes your tools need. Without it a client may ask for no scope and every gated tool fails.
 
 See [Writing an Adapter](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/WritingAnAdapter.md) for other frameworks and for the native FastMCP adapter package `auth0-ai-fastmcp`. For a complete runnable server, see [`examples/b2b_ecommerce`](https://github.com/auth0/auth0-ai-python/tree/main/packages/auth0-ai-mcp/examples/b2b_ecommerce).
 

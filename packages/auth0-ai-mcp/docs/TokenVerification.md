@@ -29,7 +29,7 @@ Fields:
 
 ## VerifyAccessTokenError
 
-The middleware catches `VerifyAccessTokenError` (imported from `auth0-api-python`) and returns the `401` (or a `503` for its subclass `AuthServerUnavailableError`), so it is never raised to the caller. Tool code does not catch this error because the token is verified before any tool runs. You only need to handle it if you call `McpServerClient.verify_access_token` yourself in custom adapter code.
+The middleware catches `VerifyAccessTokenError` (imported from `auth0-api-python`) and returns the `401` (or a `503` for its subclass `AuthServerUnavailableError`, or for a `DomainsResolverError`, which is not a `VerifyAccessTokenError`), so it is never raised to the caller. Tool code does not catch this error because the token is verified before any tool runs. You only need to handle it if you call `McpServerClient.verify_access_token` yourself in custom adapter code.
 
 ## What the middleware returns
 
@@ -39,6 +39,7 @@ The middleware answers each case as follows:
 - A token that fails verification - a `401` with `error="invalid_token"` and the fixed description "The access token is not valid". The real reason is only written to the server log.
 - A token bound to a DPoP key or a client certificate (it has a `cnf` claim) - the same `401`, even when it is sent as `Bearer`.
 - Auth0 cannot be reached to fetch the signing keys - verification raises `AuthServerUnavailableError` and the middleware returns a `503` with `Retry-After: 5` and no `WWW-Authenticate` challenge, so the client keeps its token and retries.
+- The `domains_resolver` of a prebuilt `api_client` fails - verification raises `DomainsResolverError` and the middleware returns the same `503`, with a warning in the server log.
 - Any other `VerifyAccessTokenError` - a `401`. Any other exception propagates to the framework.
 - A WebSocket connection - closed with code 1008.
 - An `OPTIONS` request - passes through to the app without verification.
