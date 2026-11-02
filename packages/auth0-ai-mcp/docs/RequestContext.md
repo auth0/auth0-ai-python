@@ -15,7 +15,7 @@ from auth0_ai_mcp import (
 )
 ```
 
-- `get_caller_principal() -> Principal | None` - returns the verified `Principal` for the current request, or `None` when called outside a request (for example in a background task or test that has not set up a context).
+- `get_caller_principal() -> Principal | None` - returns the verified `Principal` for the current request, or `None` when called outside a request, for example in startup code, in a test that has not set up a context, or in a plain `threading.Thread`. A task started inside the request with `asyncio.create_task`, or code run with `asyncio.to_thread`, still sees the caller. Such a task keeps the caller's token, so an exchange from it fails once that token has expired.
 - `require_caller_principal() -> Principal` - same as `get_caller_principal` but raises `UnauthenticatedError` instead of returning `None`.
 - `get_caller_mcp_client() -> RequestScopedMcpClient | None` - returns the request-scoped client, or `None` outside a request.
 - `require_caller_mcp_client() -> RequestScopedMcpClient` - same as above but raises `UnauthenticatedError` instead of returning `None`. Use this inside tool handlers where the adapter guarantees a caller is present, so you get a clear error rather than a silent `None`.

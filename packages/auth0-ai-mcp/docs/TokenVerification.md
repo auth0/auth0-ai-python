@@ -21,7 +21,7 @@ Fields:
 - `sub` (`str`): the subject claim identifying the caller.
 - `expires_at` (`int | float`): unix epoch seconds the token expires, from the `exp` claim.
 - `scopes` (`list[str]`): parsed from the space-separated `scope` claim. Empty list when the claim is absent.
-- `permissions` (`list[str] | None`): from the `permissions` claim. `None` when the claim is absent (RBAC not enabled on the Auth0 API definition), an empty list or populated list when present.
+- `permissions` (`list[str] | None`): from the `permissions` claim. `None` when the claim is absent, which happens when RBAC is off or the API does not add permissions to the access token. An empty or populated list when present.
 - `client_id` (`str`): from the `azp` claim, falling back to `client_id`. Never `None`, because a token with neither is rejected with a `401`.
 - `org_id` (`str | None`): from the `org_id` claim. `None` when the token carries no Organization.
 
@@ -37,10 +37,14 @@ The middleware answers each case as follows:
 
 - No token, a blank `Bearer` value, or any scheme other than `Bearer` - a `401` with a bare challenge of the form `Bearer resource_metadata="<url>"` and no `error`. The body message is "Unauthorized". DPoP is not supported yet, so a `DPoP` authorization is treated as no token.
 - A token that fails verification - a `401` with `error="invalid_token"` and the fixed description "The access token is not valid". The real reason is only written to the server log.
+- A token bound to a DPoP key or a client certificate (it has a `cnf` claim) - the same `401`, even when it is sent as `Bearer`.
 - Auth0 cannot be reached to fetch the signing keys - verification raises `AuthServerUnavailableError` and the middleware returns a `503` with `Retry-After: 5` and no `WWW-Authenticate` challenge, so the client keeps its token and retries.
 - Any other `VerifyAccessTokenError` - a `401`. Any other exception propagates to the framework.
 - A WebSocket connection - closed with code 1008.
 - An `OPTIONS` request - passes through to the app without verification.
+
+> [!WARNING]
+> DPoP is not supported. The middleware verifies every token as a plain bearer token, so DPoP options on a prebuilt `api_client` have no effect.
 
 The `resource_metadata` value in the challenge is the path-suffixed metadata URL from RFC 9728. For example, a resource URL of `https://host/mcp` gives `https://host/.well-known/oauth-protected-resource/mcp`. The metadata document is served for `GET` only, at `/.well-known/oauth-protected-resource` and at the path-suffixed path.
 

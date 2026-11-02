@@ -25,7 +25,7 @@ The template asks for a method-level inventory, so write the PR body from the di
 
 From `.github/workflows/`. Which of these are required status checks is set in branch protection, not in the repo.
 
-- **Build and Test** (`test.yml`): a package matrix with Python 3.10 to 3.12, running `pytest -v` and `ruff check .` on PR, merge group, and push to `main`
+- **Build and Test** (`test.yml`): a package matrix over the supported Python versions, running `pytest -v` and `ruff check .` on PR, merge group, and push to `main`
 - **CodeQL** (`codeql.yml`): on PR, merge group, push to `main`, and a weekly schedule
 - **SCA** (`sca_scan.yml`): Snyk scan on push and PR to `main`, with suppressions in `.snyk`
 - **Scorecard** (`scorecard.yml`): OpenSSF Scorecard checks
