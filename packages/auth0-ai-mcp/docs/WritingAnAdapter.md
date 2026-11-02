@@ -4,6 +4,8 @@ An adapter's whole job is to verify the incoming token, put the caller into the 
 
 `auth0-ai-mcp` is framework-agnostic, so any MCP framework can be wired up using the same four-step pattern. Most users will not need to write one from scratch because the package ships a ready-made ASGI middleware.
 
+The snippets use the 2.x import `mcp.server.mcpserver`. The `mcp` extra requires 2.2 or later, and the tool error text described in these guides was checked on 2.3.
+
 ## Ready-made integrations
 
 **ASGI (Starlette, FastAPI, official MCP app).** Import `Auth0AsgiMiddleware` from `auth0_ai_mcp.middleware`:
@@ -20,7 +22,20 @@ app = Auth0AsgiMiddleware(
 ```
 
 > [!WARNING]
-> The MCP SDK turns on its Host and Origin checks only when the app is bound to localhost, so keep `127.0.0.1` for local use. Bind another interface only behind a trusted proxy or after configuring the allowed hosts.
+> The MCP SDK checks the Host and Origin headers when `streamable_http_app(host=...)` is `127.0.0.1`, `localhost` or `::1`, which is also the default. Any other value, such as `"0.0.0.0"`, turns the checks off.
+
+For a public URL, keep the checks on and list your host. Without this every request to a public host gets a `421`.
+
+```python
+from mcp.server.transport_security import TransportSecuritySettings
+
+app = Auth0AsgiMiddleware(
+    mcp.streamable_http_app(
+        transport_security=TransportSecuritySettings(allowed_hosts=["your-mcp-server", "your-mcp-server:*"]),
+    ),
+    mcp_client=mcp_client,
+)
+```
 
 **Prefect FastMCP.** Use the `auth0-ai-fastmcp` package. FastMCP users do not need to hand-write an adapter.
 

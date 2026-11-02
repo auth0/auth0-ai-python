@@ -46,7 +46,7 @@ Token verification, the OBO exchange, caching, and token stores live in auth0-ap
 
 ### Always Do
 
-- Run `poetry run pytest` and `poetry run ruff check .` before committing (both run in CI on Python 3.10 to 3.12).
+- Run `poetry run pytest` and `poetry run ruff check .` before committing (both run in CI, see the Python matrix in `.github/workflows/test.yml`).
 - Make surgical changes: touch only what the request requires. Do not refactor or reformat adjacent code.
 - Follow existing style and naming. Private helpers go in `utils/_internal/` and public modules call them through the module, never by imported name. Never reorder existing declarations.
 - Add unit tests for new functionality. Async tests need no marker because `asyncio_mode = "auto"` is set. Stand in for the core client with a `Stub...` class, as `tests/test_client.py` does (no real network calls).
@@ -87,7 +87,7 @@ Token verification, the OBO exchange, caching, and token stores live in auth0-ap
 - **Downscope detection:** `exchange.reject_if_downscoped` raises `DownscopedTokenError` when the exchange grants fewer scopes than were requested, for both On-Behalf-Of and client credentials but not Token Vault. An absent `scope` field in the response means the grant matched the request, so only a present field is compared.
 - **Expired results are rejected:** after every exchange `exchange.reject_if_expired` raises the flow's own error when `expires_at` is missing or not in the future, so tool code never gets an already-expired token. Any leeway for clock skew belongs in the core SDK.
 - **Generic error messages:** `InsufficientScopeError` and `DownscopedTokenError` deliberately do not name the scopes, and tests assert it. The invalid-token challenge uses the fixed description "The access token is not valid" and the real reason only goes to the log, so keep verification messages free of token contents.
-- **Token stores:** a store is the integrator's `AbstractTokenStore`, and the base class encrypts values with a secret of at least 32 characters. Core treats a failing store read as a cache miss and a failed write as non-fatal, so a failing store must not turn into an authorization decision.
+- **Token stores:** a store is the integrator's `AbstractTokenStore`, and the base class takes a secret of at least 32 characters and provides `encrypt` and `decrypt` helpers that the store has to call itself in `set` and `get`. Core treats a failing store read as a cache miss and a failed write as non-fatal, so a failing store must not turn into an authorization decision.
 - **Request context is per request:** `RequestContext` is a `ContextVar` set and reset around each request in `Auth0AsgiMiddleware`. Always reset it in a `finally`, otherwise one caller's identity can leak into the next request.
 - **Dependency scanning:** Snyk (`sca_scan.yml`), CodeQL (`codeql.yml`), OpenSSF Scorecard (`scorecard.yml`), and ruff `S` (bandit) rules in CI.
 

@@ -34,7 +34,7 @@ client = create_mcp_client(
 
 ### Passing a prebuilt client
 
-`ApiClient` comes from [`auth0-api-python`](https://github.com/auth0/auth0-api-python), the library `auth0-ai-mcp` is built on. Build one yourself when you need an option `create_mcp_client` does not expose, such as multi-domain mode or DPoP settings.
+`ApiClient` comes from [`auth0-api-python`](https://github.com/auth0/auth0-api-python), the library `auth0-ai-mcp` is built on. Build one yourself when you need an option `create_mcp_client` does not expose, such as multi-domain mode.
 
 ```python
 from auth0_api_python import ApiClient, ApiClientOptions

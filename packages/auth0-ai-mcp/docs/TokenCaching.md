@@ -18,7 +18,7 @@ client = create_mcp_client(
 
 ## The store interface
 
-`AbstractTokenStore` is exported from `auth0_ai_mcp` and defined in `auth0-api-python`. It is abstract. You provide a concrete implementation with three async methods, `get`, `set`, and `delete`. The base class takes a `secret` of at least 32 characters (for example from `openssl rand -hex 32`) and gives you `encrypt(key, value)` and `decrypt(key, data)`, so the store only ever holds encrypted values.
+`AbstractTokenStore` is exported from `auth0_ai_mcp` and defined in `auth0-api-python`. It is abstract. You provide a concrete implementation with three async methods, `get`, `set`, and `delete`. The base class takes a `secret` of at least 32 characters (for example from `openssl rand -hex 32`) and gives you `encrypt(key, value)` and `decrypt(key, data)` helpers. The SDK passes plain values to `set`, so call `self.encrypt(key, value)` in `set` and `self.decrypt(key, data)` in `get`. Otherwise the store holds tokens in plain text.
 
 The package ships no concrete store. The [`examples/b2b_ecommerce`](../examples/b2b_ecommerce/) example includes in-memory `InMemoryTokenStore` and `InMemoryIndexedTokenStore` classes in `token_store.py`. They show the shape of a store but lose every token on restart, so a production server needs a shared store such as Redis.
 
@@ -31,7 +31,7 @@ If the store raises on a read, the SDK logs a warning and treats it as a cache m
 
 ## Cache key
 
-The cache key is derived from the caller's `sub`, the `audience`, the organization, the scopes, and the session. Tokens are stored under the scopes Auth0 actually granted (see "Scope re-check on every hit" below), so two requests from the same user that end up with different granted scopes are separate cache entries under `"strict"` mode.
+The cache key is derived from the caller's `sub`, the `audience`, the organization, the scopes, and the session. On Auth0 an access token has no `sid`, and on the default profile no `jti` either, so the session part is a digest of the incoming access token. Reuse therefore happens only across calls with the same access token. After a refresh the user gets a new set of entries, and the old ones stay until `expires_at`. Tokens are stored under the scopes Auth0 actually granted (see "Scope re-check on every hit" below), so two requests from the same user that end up with different granted scopes are separate cache entries under `"strict"` mode.
 
 M2M tokens from `get_client_credentials_token` are keyed on tenant, client ID, audience, and scope set. Connection tokens from `get_token_for_connection` are keyed on tenant, client ID, `sub`, `connection`, and `login_hint` with no scope dimension. Scope-matching modes (`strict` and `non_strict`) apply to OBO tokens only.
 

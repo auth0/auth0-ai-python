@@ -39,13 +39,14 @@ secured_app = Auth0AsgiMiddleware(
 )
 ```
 
-From this point on, the library verifies every incoming token, rejects bad ones with a `401` before any tool runs, and serves the protected resource metadata. See [Token Verification](./docs/TokenVerification.md) and [Configuration](./docs/Configuration.md).
+From this point on, the library verifies every incoming token, rejects bad ones with a `401` before any tool runs, and serves the protected resource metadata. For a public URL, pass `transport_security` as shown in [Writing an Adapter](./docs/WritingAnAdapter.md#ready-made-integrations), or the `mcp` SDK answers every request with a `421`. See [Token Verification](./docs/TokenVerification.md) and [Configuration](./docs/Configuration.md).
 
 ## Writing a gated tool
 
 ```python
 from auth0_ai_mcp import require_caller_mcp_client, with_required_scopes
 
+@mcp.tool()
 @with_required_scopes("read:weather")
 async def get_weather(location: str) -> dict:
     auth0 = require_caller_mcp_client()
@@ -57,7 +58,7 @@ async def get_weather(location: str) -> dict:
     ...
 ```
 
-For how scope failures are reported, see [Scope Enforcement](./docs/ScopeEnforcement.md#errors).
+Keep `@mcp.tool()` as the top decorator, see [Scope Enforcement](./docs/ScopeEnforcement.md#decorator-form). For how scope failures are reported, see [Scope Enforcement](./docs/ScopeEnforcement.md#errors).
 
 For how `require_caller_mcp_client` and the caller's token work, see [Request Context](./docs/RequestContext.md#requestscopedmcpclient).
 

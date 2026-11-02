@@ -1,6 +1,6 @@
 # Commands
 
-Run these from the `auth0-ai-mcp` directory. They match `.github/workflows/test.yml` (Poetry 2.2.1, Python 3.10 to 3.12) and `CONTRIBUTING.md`.
+Run these from the `auth0-ai-mcp` directory. They match `.github/workflows/test.yml` and `CONTRIBUTING.md`.
 
 ```bash
 # Install dependencies and the package (CI runs both steps)

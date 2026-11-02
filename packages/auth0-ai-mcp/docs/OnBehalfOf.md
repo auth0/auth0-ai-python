@@ -4,6 +4,16 @@ The On-Behalf-Of (OBO) exchange trades the caller's incoming token for a narrowe
 
 The exchange uses RFC 8693 through `auth0-api-python`. Auth0 is the authority on which downstream audiences a given client may exchange for, so the audience you pass must be one Auth0 is configured to issue tokens for. The `client_id` and `client_secret` options this needs are described in [Configuration](./Configuration.md).
 
+## Tenant setup
+
+The exchange only works when the tenant is set up for it. The [example README](../examples/b2b_ecommerce/README.md#what-you-need-on-the-tenant) has the full commands.
+
+- The `client_id` must belong to a Custom API client, which is a client with `app_type` set to `resource_server` and linked to your MCP server's API.
+- On-Behalf-Of must be enabled on that client. See the [Auth0 guide](https://auth0.com/docs/secure/call-apis-on-users-behalf/on-behalf-of-token-exchange).
+- Each downstream API must allow token swaps without user consent (`skip_consent_for_verifiable_first_party_clients`), otherwise Auth0 refuses the swap with a `400`.
+
+Failures from Auth0, such as a refused swap, arrive as `ApiError` (importable from `auth0_ai_mcp`) with the Auth0 error in `code` and the HTTP status in `status_code`.
+
 ## Calling the exchange inside a tool
 
 Inside a tool, get the request-scoped client with `require_caller_mcp_client()` and call `get_token_on_behalf_of` on it:
@@ -11,6 +21,7 @@ Inside a tool, get the request-scoped client with `require_caller_mcp_client()` 
 ```python
 from auth0_ai_mcp import require_caller_mcp_client, with_required_scopes
 
+@mcp.tool()
 @with_required_scopes("read:weather")
 async def get_weather(location: str) -> dict:
     auth0 = require_caller_mcp_client()
@@ -56,3 +67,5 @@ token = await auth0.get_client_credentials_token(audience="https://internal-api/
 ```
 
 The result has the same `TokenSet` shape, including `granted_scopes`. It runs the same downscope check and raises `DownscopedTokenError`, and it raises `GetClientCredentialsTokenError` when the token is already expired.
+
+`scope` does not narrow this token. Auth0 returns the full grant of the client, so the downscope check cannot fire when the token carries more scopes than requested, and a scope the client was not granted is refused. Keep the client grant minimal.

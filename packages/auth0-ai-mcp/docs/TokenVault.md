@@ -21,6 +21,7 @@ RequestScopedMcpClient.get_token_for_connection(*, connection: str, login_hint: 
 ```python
 from auth0_ai_mcp import require_caller_mcp_client, with_required_scopes
 
+@mcp.tool()
 @with_required_scopes("tool:list_calendar_events")
 async def list_calendar_events() -> str:
     auth0 = require_caller_mcp_client()
@@ -30,11 +31,11 @@ async def list_calendar_events() -> str:
 
 The returned `TokenSet` carries `access_token` and `expires_at`, plus `granted_scopes` when the token response carried a `scope`. Token Vault results are not downscope-checked (see [Downscope protection](./OnBehalfOf.md#downscope-protection)). If the returned token is already expired, `get_token_for_connection` raises `GetAccessTokenForConnectionError`.
 
-The scope in `with_required_scopes` must be in the caller's token (see [ScopeEnforcement.md](ScopeEnforcement.md#tenant-side-setup-scopes-must-be-in-the-client-grant)). The user must also have linked a Google account first, or the exchange returns `invalid_grant`. See [Linking an account](#linking-an-account).
+The scope in `with_required_scopes` must be in the caller's token (see [ScopeEnforcement.md](ScopeEnforcement.md#tenant-side-setup-scopes-must-be-in-the-client-grant)). The user must also have linked a Google account first, or the exchange fails with HTTP 401 `federated_connection_refresh_token_not_found`. In the SDK it arrives as an `ApiError` with that value in `code`, so a tool can match on it. See [Linking an account](#linking-an-account).
 
 ## login_hint
 
-Pass `login_hint` with the user's email to pre-fill the federated login prompt if the provider requires a fresh interactive step.
+Pass `login_hint` only to pick one account when the user has linked several accounts on the same connection. A hint that matches none of them gives a 401. It does not prefill anything, because the exchange is a single back channel call.
 
 ## Caching
 
@@ -42,7 +43,7 @@ If a `token_store` was passed to `create_mcp_client`, connection tokens are cach
 
 ## Auth0 setup requirements
 
-The Token Vault grant must be enabled on the client application in the Auth0 dashboard. The federated connection must be configured and enabled on the same application. The user must have linked their external account via Auth0's Connected Accounts flow before a token can be exchanged.
+The Token Vault grant must be enabled on a Custom API client linked to your MCP server's API, because Auth0 accepts the caller's access token as the subject only from that client type. A regular application fails with "This client is not a resource server and cannot exchange access tokens". [Step 2 of the example README](../examples/b2b_ecommerce/README.md#2-create-the-obo-client) creates this client. The federated connection must be configured and enabled on the same client. The user must have linked their external account via Auth0's Connected Accounts flow before a token can be exchanged.
 
 - [Configure Token Vault](https://auth0.com/docs/secure/tokens/token-vault/configure-token-vault)
 - [Connected Accounts for Token Vault](https://auth0.com/docs/secure/tokens/token-vault/connected-accounts-for-token-vault)
