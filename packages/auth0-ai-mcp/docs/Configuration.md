@@ -23,6 +23,7 @@ client = create_mcp_client(
 - `scope_matching` (str, default `"strict"`) - either `"strict"` or `"non_strict"`. See [Scope-matching modes](./TokenCaching.md#scope-matching-modes).
 - `organization_policy` (str, default `"allow"`) - either `"allow"` or `"required"`. See [Organization Policy](./OrganizationPolicy.md).
 - `organization_id` (str | list[str] | None, default `None`) - the organization or organizations accepted when the policy is `"required"`. See [Organization Policy](./OrganizationPolicy.md).
+- `client_info` (dict | None, default `None`) - identifies a package built on this one in the `Auth0-Client` header. A dict with non-empty string `name` and `version` keys and an optional `env` dict of string keys and values.
 - `api_client` (ApiClient | None, default `None`) - a ready-made client to use as is. See [Passing a prebuilt client](#passing-a-prebuilt-client).
 
 `scope_matching` and `organization_policy` only accept the values listed above.
