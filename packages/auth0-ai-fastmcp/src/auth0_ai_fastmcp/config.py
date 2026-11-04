@@ -65,7 +65,7 @@ class Auth0FastMCP:
     def __init__(self, options: Auth0FastMCPOptions) -> None:
         self._options = options
         validation.require_bare_domain(options.domain)
-        audience = validation.resolve_audience(options)
+        audience = validation.resolve_audience(options.resource_url, options.mcp_path, options.audience)
         self._mcp_client = create_mcp_client(
             options.domain,
             audience,
