@@ -45,7 +45,7 @@ If neither built-in option covers your framework, follow these four steps.
 
 ### 1. Pull and validate the bearer token
 
-Read the `Authorization` header. If the token is missing or blank, or the scheme is not `Bearer`, respond `401` and stop. The challenge should carry `resource_metadata` and no `error`. Build the header with `build_www_authenticate(resource_metadata_url)` from `auth0_ai_mcp.middleware`. The request must never reach a tool handler without a verified token.
+Read the `Authorization` header. If the token is missing or blank, or the scheme is not `Bearer`, respond `401` and stop. The challenge should carry `resource_metadata` and no `error`, and `scope` if you advertise scopes. Build the header with `build_www_authenticate(resource_metadata_url, scope=...)` from `auth0_ai_mcp.middleware`. The request must never reach a tool handler without a verified token.
 
 ### 2. Verify the token and get the caller
 

@@ -35,7 +35,7 @@ The middleware catches `VerifyAccessTokenError` (imported from `auth0-api-python
 
 The middleware answers each case as follows:
 
-- No token, a blank `Bearer` value, or any scheme other than `Bearer` - a `401` with a bare challenge of the form `Bearer resource_metadata="<url>"` and no `error`. The body message is "Unauthorized". DPoP is not supported yet, so a `DPoP` authorization is treated as no token.
+- No token, a blank `Bearer` value, or any scheme other than `Bearer` - a `401` with a bare challenge of the form `Bearer resource_metadata="<url>"` and no `error`. When `scopes_supported` is set, both `401` challenges also carry `scope="<scopes>"`, the same scopes as the metadata document, so the client knows what to request at login. The body message is "Unauthorized". DPoP is not supported yet, so a `DPoP` authorization is treated as no token.
 - A token that fails verification - a `401` with `error="invalid_token"` and the fixed description "The access token is not valid". The real reason is only written to the server log.
 - A token bound to a DPoP key or a client certificate (it has a `cnf` claim) - the same `401`, even when it is sent as `Bearer`.
 - Auth0 cannot be reached to fetch the signing keys - verification raises `AuthServerUnavailableError` and the middleware returns a `503` with `Retry-After: 5` and no `WWW-Authenticate` challenge, so the client keeps its token and retries.
@@ -51,7 +51,7 @@ The `resource_metadata` value in the challenge is the path-suffixed metadata URL
 
 When the `mcp` package is installed, the middleware also sets `scope["user"]` and `scope["auth"]` for the MCP session manager, with the raw token replaced by the literal "redacted".
 
-To build the same header in custom code, use `build_www_authenticate(resource_metadata_url, error=None, error_description=None)`, imported from `auth0_ai_mcp.middleware`. It makes every value safe for a quoted header.
+To build the same header in custom code, use `build_www_authenticate(resource_metadata_url, error=None, error_description=None, scope=None)`, imported from `auth0_ai_mcp.middleware`. It makes every value safe for a quoted header.
 
 ## Related
 
