@@ -18,15 +18,54 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  changes:
+    name: changes
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.pick.outputs.packages }}
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+
+    - name: Pick packages to test
+      id: pick
+      env:
+        EVENT: ${{ github.event_name }}
+      run: |
+        mcp=false
+        fast=false
+        if [ "$EVENT" != "pull_request" ]; then
+          mcp=true
+          fast=true
+        else
+          # Parent 1 of the PR merge commit is the live base, unlike the stale base sha in the event
+          files=$(git -c core.quotePath=false diff --no-renames --name-only HEAD^1 HEAD)
+          while read -r file; do
+            case "$file" in
+              .github/workflows/test.yml) mcp=true; fast=true ;;
+              packages/auth0-ai-mcp/*) mcp=true ;;
+              packages/auth0-ai-fastmcp/*) fast=true ;;
+            esac
+          done <<< "$files"
+        fi
+        list=()
+        [ "$mcp" = true ] && list+=('"packages/auth0-ai-mcp"')
+        [ "$fast" = true ] && list+=('"packages/auth0-ai-fastmcp"')
+        echo "packages=[$(IFS=,; echo "${list[*]}")]" >> "$GITHUB_OUTPUT"
+
   test:
     name: test (${{ matrix.package }}, py${{ matrix.python-version }})
+    needs: changes
+    if: needs.changes.outputs.packages != '[]'
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: ${{ matrix.package }}
     strategy:
       matrix:
-        package: [packages/auth0-ai-mcp, packages/auth0-ai-fastmcp]
+        package: ${{ fromJSON(needs.changes.outputs.packages) }}
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
 
     steps:
