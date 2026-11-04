@@ -1,0 +1,30 @@
+### Python ###
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+#Environments
+.env
+.venv
+.venv-*
+env/
+
+#Session Cache
+.sessions_cache
+.DS_Store
+
+#Build files
+dist
+
+#Test and lint caches
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+
+# IDE
+.idea/
+
+# AI Tools
+.claude/
