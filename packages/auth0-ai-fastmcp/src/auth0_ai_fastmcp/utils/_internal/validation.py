@@ -8,8 +8,6 @@ from pydantic import AnyHttpUrl, ValidationError
 if TYPE_CHECKING:
     from fastmcp.server.auth.providers.auth0 import Auth0MCPProvider
 
-    from ...config import Auth0FastMCPOptions
-
 
 def require_bare_domain(domain: str) -> None:
     """Reject a domain that FastMCP and the core client could not build their URLs from."""
@@ -17,18 +15,18 @@ def require_bare_domain(domain: str) -> None:
         raise ConfigurationError("domain must be a bare host such as tenant.auth0.com, with no scheme, path, query or whitespace")
 
 
-def resolve_audience(options: Auth0FastMCPOptions) -> str:
+def resolve_audience(resource_url: str, mcp_path: str, audience: str | None) -> str:
     """Return the audience, defaulting to the resource FastMCP advertises, which tokens must carry as `aud`."""
     try:
-        base = AnyHttpUrl(options.resource_url)
+        base = AnyHttpUrl(resource_url)
     except (ValidationError, TypeError) as exc:
         raise ConfigurationError("resource_url must be an absolute http or https URL with a host") from exc
     if base.query or base.fragment or base.username is not None or base.password is not None:
         raise ConfigurationError("resource_url must not contain a query, fragment or credentials")
-    if not options.mcp_path.startswith("/") or "?" in options.mcp_path or "#" in options.mcp_path:
+    if not mcp_path.startswith("/") or "?" in mcp_path or "#" in mcp_path:
         raise ConfigurationError('mcp_path must start with "/" and hold no query or fragment')
-    advertised = resource_at(options.resource_url, options.mcp_path)
-    if options.audience is not None and options.audience != advertised:
+    advertised = resource_at(resource_url, mcp_path)
+    if audience is not None and audience != advertised:
         raise ConfigurationError(
             f"audience must equal resource_url plus mcp_path ({advertised}), because that is the resource clients request a token for. "
             "Omit audience to use it."
