@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 try:
     from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
     from mcp.server.auth.provider import AccessToken
-except ImportError:  # Without mcp there is no session manager to bind, so scope["user"] is skipped.
+except ModuleNotFoundError:  # Only a missing mcp is tolerated, so a renamed class fails loudly.
     AuthenticatedUser = None
     AccessToken = None
 

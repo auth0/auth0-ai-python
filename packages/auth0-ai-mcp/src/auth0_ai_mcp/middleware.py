@@ -26,7 +26,7 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 from .client import McpServerClient
 from .principal import build_principal
 from .request_context import RequestContext, bind_request_context
-from .utils._internal import headers, mcp_session, urls
+from .utils._internal import headers, mcp_session, scope_input, urls
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def build_protected_resource_metadata(
         The metadata document as a dict.
 
     Raises:
-        ConfigurationError: If `resource_url` differs from the client audience or is not an absolute http or https URL, or if `authorization_servers` cannot be resolved or holds anything but absolute https URLs.
+        ConfigurationError: If `resource_url` differs from the client audience or is not an absolute http or https URL, or if `authorization_servers` cannot be resolved or holds anything but absolute https URLs, or if `scopes_supported` is not a list of single-value strings.
     """
     doc: dict = {
         "resource": urls.resolve_resource_url(mcp_client, resource_url),
@@ -65,7 +65,7 @@ def build_protected_resource_metadata(
         "bearer_methods_supported": ["header"],
     }
     if scopes_supported is not None:
-        doc["scopes_supported"] = scopes_supported
+        doc["scopes_supported"] = scope_input.normalize_advertised_scopes(scopes_supported)
     if resource_name is not None:
         doc["resource_name"] = resource_name
     if resource_documentation is not None:
@@ -114,7 +114,7 @@ class Auth0AsgiMiddleware:
         resource_documentation: Optional URL of documentation for the resource, advertised in the metadata document.
 
     Raises:
-        ConfigurationError: If `resource_url` differs from the client audience or is not an absolute http or https URL, or if `authorization_servers` cannot be resolved or holds anything but absolute https URLs.
+        ConfigurationError: If `resource_url` differs from the client audience or is not an absolute http or https URL, or if `authorization_servers` cannot be resolved or holds anything but absolute https URLs, or if `scopes_supported` is not a list of single-value strings.
     """
 
     def __init__(
@@ -142,7 +142,7 @@ class Auth0AsgiMiddleware:
         suffixed_path = _PRM_PATH + urls.resource_path(parts.path)
         self._metadata_paths = {_PRM_PATH, suffixed_path}
         self._metadata_url = f"{parts.scheme}://{parts.netloc}{suffixed_path}"
-        self._challenge_scope = " ".join(scopes_supported) if scopes_supported else None
+        self._challenge_scope = " ".join(self._metadata.get("scopes_supported", [])) or None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "websocket":
@@ -165,6 +165,11 @@ class Auth0AsgiMiddleware:
         token = headers.bearer_token(scope)
         if token is None:
             await self._send_unauthorized(send)
+            return
+
+        if not headers.is_well_formed_token(token):
+            logger.warning("Token rejected: malformed bearer value")
+            await self._send_unauthorized(send, error="invalid_token")
             return
 
         try:
@@ -220,7 +225,10 @@ class Auth0AsgiMiddleware:
             "id": None,
         }
         await self._send_json(
-            send, 401, payload, headers=[(b"www-authenticate", challenge.encode("ascii"))]
+            send,
+            401,
+            payload,
+            headers=[(b"www-authenticate", challenge.encode("ascii")), (b"cache-control", b"no-store")],
         )
 
     async def _send_unavailable(self, send: Send) -> None:
@@ -230,4 +238,6 @@ class Auth0AsgiMiddleware:
             "error": {"code": -32002, "message": "Service unavailable: the token could not be verified"},
             "id": None,
         }
-        await self._send_json(send, 503, payload, headers=[(b"retry-after", b"5")])
+        await self._send_json(
+            send, 503, payload, headers=[(b"retry-after", b"5"), (b"cache-control", b"no-store")]
+        )

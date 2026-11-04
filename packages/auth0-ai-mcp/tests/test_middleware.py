@@ -1,8 +1,10 @@
 """ASGI middleware behavior: bearer handling, request context, and protected-resource metadata."""
 
 import base64
+import importlib
 import json
 import logging
+import sys
 from types import SimpleNamespace
 
 import httpx
@@ -13,6 +15,7 @@ from auth0_api_python.errors import (
     DomainsResolverError,
     VerifyAccessTokenError,
 )
+from mcp.server.auth.middleware import bearer_auth
 from mcp.server.auth.middleware.bearer_auth import AuthenticatedUser
 from mcp.server.lowlevel import Server
 from mcp.server.streamable_http_manager import StreamableHTTPSessionManager
@@ -29,6 +32,7 @@ from auth0_ai_mcp.middleware import (
     build_protected_resource_metadata,
     build_www_authenticate,
 )
+from auth0_ai_mcp.utils._internal import mcp_session
 
 RESOURCE_URL = "https://mcp.example/mcp"
 DOMAIN = "tenant.example"
@@ -183,6 +187,25 @@ async def test_blank_bearer_token_is_treated_as_missing(value):
     assert api.verified_tokens == []
 
 
+@pytest.mark.parametrize(
+    "token",
+    ["two parts", "tab\tinside", "line\nbreak", "non\xa0breaking"],
+    ids=["space", "tab", "newline", "nbsp"],
+)
+async def test_malformed_bearer_value_gets_invalid_token_without_calling_core(token, caplog):
+    app = StubApp()
+    api = StubApiClient(claims=_claims())
+
+    with caplog.at_level(logging.WARNING, logger="auth0_ai_mcp.middleware"):
+        sent = await _call(_middleware(app, api), _scope(headers=_bearer(token)))
+
+    assert _status(sent) == 401
+    assert b'error="invalid_token"' in _header(sent, b"www-authenticate")
+    assert app.calls == 0
+    assert api.verified_tokens == []
+    assert token not in caplog.text
+
+
 async def test_bearer_scheme_is_matched_case_insensitively():
     app = StubApp()
     api = StubApiClient(claims=_claims())
@@ -325,6 +348,27 @@ async def test_unreachable_auth_server_returns_503_without_a_challenge_and_skips
     assert "Failed to fetch JWKS" in caplog.text
     assert "secret-tok" not in caplog.text
     assert app.calls == 0
+
+
+@pytest.mark.parametrize("raises", [None, VerifyAccessTokenError("bad"), AuthServerUnavailableError("down")])
+async def test_error_responses_are_not_cacheable(raises):
+    api = StubApiClient(claims=_claims(), raises=raises)
+    headers = [] if raises is None else _bearer("tok")
+
+    sent = await _call(_middleware(StubApp(), api), _scope(headers=headers))
+
+    assert _status(sent) in (401, 503)
+    assert _header(sent, b"cache-control") == b"no-store"
+
+
+async def test_metadata_document_is_not_marked_no_store():
+    sent = await _call(
+        _middleware(StubApp(), StubApiClient(claims=_claims())),
+        _scope(path="/.well-known/oauth-protected-resource/mcp", method="GET"),
+    )
+
+    assert _status(sent) == 200
+    assert _header(sent, b"cache-control") is None
 
 
 async def test_unreachable_auth_server_reason_is_escaped_in_the_log(caplog):
@@ -520,6 +564,30 @@ async def test_mcp_session_stays_bound_to_the_caller_that_opened_it():
     assert same.status_code == 200
 
 
+@pytest.fixture
+def reloaded_mcp_session(monkeypatch):
+    yield lambda: importlib.reload(mcp_session)
+    monkeypatch.undo()
+    importlib.reload(mcp_session)
+
+
+def test_session_binding_is_skipped_when_mcp_is_not_installed(monkeypatch, reloaded_mcp_session):
+    monkeypatch.setitem(sys.modules, "mcp", None)
+    monkeypatch.setitem(sys.modules, "mcp.server.auth.middleware.bearer_auth", None)
+
+    module = reloaded_mcp_session()
+
+    assert module.AuthenticatedUser is None
+    assert module.AccessToken is None
+
+
+def test_a_renamed_mcp_class_fails_loudly_instead_of_skipping_session_binding(monkeypatch, reloaded_mcp_session):
+    monkeypatch.delattr(bearer_auth, "AuthenticatedUser")
+
+    with pytest.raises(ImportError):
+        reloaded_mcp_session()
+
+
 async def test_context_is_reset_after_request():
     await _call(
         _middleware(StubApp(), StubApiClient(claims=_claims())),
@@ -598,6 +666,27 @@ def test_metadata_omits_scopes_supported_when_not_given():
     doc = build_protected_resource_metadata(McpServerClient(StubApiClient()))
 
     assert "scopes_supported" not in doc
+
+
+def test_metadata_advertises_an_empty_scope_list_as_given():
+    doc = build_protected_resource_metadata(McpServerClient(StubApiClient()), scopes_supported=[])
+
+    assert doc["scopes_supported"] == []
+
+
+@pytest.mark.parametrize(
+    "scopes",
+    ["read:x", ("read:x",), ["read:x", ""], ["read:x", "  "], ["read:x write:x"], ["read:x", 1], [None]],
+    ids=["bare_string", "tuple", "blank", "whitespace_only", "inner_space", "non_string", "none_entry"],
+)
+def test_metadata_rejects_malformed_scopes_supported(scopes):
+    with pytest.raises(ConfigurationError, match="scope"):
+        build_protected_resource_metadata(McpServerClient(StubApiClient()), scopes_supported=scopes)
+
+
+def test_middleware_rejects_malformed_scopes_supported_at_startup():
+    with pytest.raises(ConfigurationError, match="scope"):
+        _middleware(StubApp(), StubApiClient(), scopes_supported="read:x")
 
 
 def test_metadata_omits_resource_name_and_documentation_when_not_given():

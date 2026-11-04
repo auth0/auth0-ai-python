@@ -17,3 +17,8 @@ def bearer_token(scope: Scope) -> str | None:
             if len(parts) == 2 and parts[0].lower() == "bearer":
                 return parts[1].strip() or None
     return None
+
+
+def is_well_formed_token(token: str) -> bool:
+    """Whether the token has no whitespace inside it, so malformed values never reach verification."""
+    return not any(ch.isspace() for ch in token)

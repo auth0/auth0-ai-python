@@ -20,9 +20,11 @@ def token_set(result: dict) -> TokenSet:
 
 
 def reject_if_expired(result: dict, error: type[BaseAuthError]) -> None:
-    """Raise `error` if the returned token has no usable `expires_at` or has already expired."""
+    """Raise `error` if the returned token has no usable `expires_at` or has already expired, with a separate message for each."""
     expires_at = result.get("expires_at")
-    if isinstance(expires_at, bool) or not isinstance(expires_at, (int, float)) or expires_at <= time.time():
+    if isinstance(expires_at, bool) or not isinstance(expires_at, (int, float)):
+        raise error("The exchanged token has no usable expiry.")
+    if expires_at <= time.time():
         raise error("The exchanged token is already expired.")
 
 

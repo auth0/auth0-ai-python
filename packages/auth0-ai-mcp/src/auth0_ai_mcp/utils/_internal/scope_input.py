@@ -23,3 +23,20 @@ def normalize_scopes(scopes: str | list[str]) -> list[str]:
     if any(any(c.isspace() for c in s) for s in required):
         raise ConfigurationError("each scope must be a single value without whitespace, so pass a list for several scopes")
     return list(required)
+
+
+def normalize_advertised_scopes(scopes: list[str]) -> list[str]:
+    """Return the scopes to advertise, where an empty list means none are advertised.
+
+    Args:
+        scopes: The scopes to advertise.
+
+    Returns:
+        The scopes as a list.
+
+    Raises:
+        ConfigurationError: If `scopes` is not a list, or holds a non-string, blank or whitespace-containing entry.
+    """
+    if not isinstance(scopes, list):
+        raise ConfigurationError("scopes_supported must be a list of strings")
+    return normalize_scopes(scopes) if scopes else []

@@ -274,14 +274,19 @@ async def test_exchange_rejection_propagates_core_error():
 
 @pytest.mark.parametrize("flow", ["obo", "client_credentials", "token_vault"])
 @pytest.mark.parametrize(
-    "expires_at",
-    [int(time.time()) - 1, _MISSING, None, "soon"],
+    ("expires_at", "message"),
+    [
+        (int(time.time()) - 1, "already expired"),
+        (_MISSING, "no usable expiry"),
+        (None, "no usable expiry"),
+        ("soon", "no usable expiry"),
+    ],
     ids=["past", "missing", "none", "non_numeric"],
 )
-async def test_result_without_a_future_numeric_expires_at_is_rejected(flow, expires_at):
+async def test_result_without_a_future_numeric_expires_at_is_rejected(flow, expires_at, message):
     client = McpServerClient(StubApiClient(expires_at_override=expires_at))
 
-    with pytest.raises(_ERROR_BY_FLOW[flow]):
+    with pytest.raises(_ERROR_BY_FLOW[flow], match=message):
         await _run_flow(client, flow)
 
 
