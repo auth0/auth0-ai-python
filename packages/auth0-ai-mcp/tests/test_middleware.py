@@ -220,6 +220,33 @@ async def test_challenge_keeps_the_port_of_the_resource_url():
     )
 
 
+async def test_challenge_lists_the_advertised_scopes_when_there_is_no_token():
+    api = StubApiClient(claims=_claims())
+
+    sent = await _call(_middleware(StubApp(), api, scopes_supported=["read:x", "write:x"]), _scope())
+
+    assert _header(sent, b"www-authenticate") == (
+        f'Bearer resource_metadata="{PRM_URL}", scope="read:x write:x"'.encode()
+    )
+
+
+async def test_invalid_token_challenge_lists_the_advertised_scopes():
+    api = StubApiClient(raises=VerifyAccessTokenError("bad"))
+
+    sent = await _call(_middleware(StubApp(), api, scopes_supported=["read:x"]), _scope(headers=_bearer("tok")))
+
+    assert _header(sent, b"www-authenticate") == (
+        f'Bearer error="invalid_token", error_description="The access token is not valid", '
+        f'resource_metadata="{PRM_URL}", scope="read:x"'
+    ).encode()
+
+
+async def test_challenge_has_no_scope_when_the_advertised_list_is_empty():
+    sent = await _call(_middleware(StubApp(), StubApiClient(claims=_claims()), scopes_supported=[]), _scope())
+
+    assert _header(sent, b"www-authenticate") == f'Bearer resource_metadata="{PRM_URL}"'.encode()
+
+
 def _unsigned_jwt(header, payload):
     def encode(value):
         return base64.urlsafe_b64encode(json.dumps(value).encode()).rstrip(b"=").decode()
@@ -362,6 +389,18 @@ def test_build_www_authenticate_with_error():
     assert build_www_authenticate(PRM_URL, "invalid_token", "Expired") == (
         f'Bearer error="invalid_token", error_description="Expired", resource_metadata="{PRM_URL}"'
     )
+
+
+def test_build_www_authenticate_with_scope():
+    assert build_www_authenticate(PRM_URL, scope="read:x write:x") == (
+        f'Bearer resource_metadata="{PRM_URL}", scope="read:x write:x"'
+    )
+
+
+def test_build_www_authenticate_sanitizes_the_scope():
+    challenge = build_www_authenticate(PRM_URL, scope='a"b\\\r\nX: y')
+
+    assert challenge.endswith("scope=\"a'b   X: y\"")
 
 
 def test_build_www_authenticate_sanitizes_every_value():

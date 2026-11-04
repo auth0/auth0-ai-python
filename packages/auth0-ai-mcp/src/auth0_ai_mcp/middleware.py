@@ -74,7 +74,10 @@ def build_protected_resource_metadata(
 
 
 def build_www_authenticate(
-    resource_metadata_url: str, error: str | None = None, error_description: str | None = None
+    resource_metadata_url: str,
+    error: str | None = None,
+    error_description: str | None = None,
+    scope: str | None = None,
 ) -> str:
     """Build a Bearer `WWW-Authenticate` challenge with every value made safe for a quoted header.
 
@@ -82,6 +85,7 @@ def build_www_authenticate(
         resource_metadata_url: URL of the protected-resource metadata document.
         error: Optional RFC 6750 error code. Leave None when the request carried no token.
         error_description: Optional human-readable description, only sent alongside `error`.
+        scope: Optional space-separated scopes the client should request. Omitted from the challenge when None.
 
     Returns:
         The challenge, ASCII only, for example `Bearer resource_metadata="https://host/.well-known/oauth-protected-resource"`.
@@ -92,6 +96,8 @@ def build_www_authenticate(
         if error_description is not None:
             params.append(f'error_description="{headers.header_safe(error_description)}"')
     params.append(f'resource_metadata="{headers.header_safe(resource_metadata_url)}"')
+    if scope is not None:
+        params.append(f'scope="{headers.header_safe(scope)}"')
     return "Bearer " + ", ".join(params)
 
 
@@ -103,7 +109,7 @@ class Auth0AsgiMiddleware:
         mcp_client: The server client that verifies tokens.
         resource_url: Absolute http or https URL of the protected resource. Defaults to the client audience and must equal it when given.
         authorization_servers: Issuer URLs to advertise, each an absolute https URL. Defaults to the client's tenant domain and is required when the client has no single domain.
-        scopes_supported: Optional scopes to advertise in the metadata document.
+        scopes_supported: Optional scopes to advertise in the metadata document and in the `401` challenge.
         resource_name: Optional human-readable name for the resource, advertised in the metadata document.
         resource_documentation: Optional URL of documentation for the resource, advertised in the metadata document.
 
@@ -136,6 +142,7 @@ class Auth0AsgiMiddleware:
         suffixed_path = _PRM_PATH + urls.resource_path(parts.path)
         self._metadata_paths = {_PRM_PATH, suffixed_path}
         self._metadata_url = f"{parts.scheme}://{parts.netloc}{suffixed_path}"
+        self._challenge_scope = " ".join(scopes_supported) if scopes_supported else None
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] == "websocket":
@@ -200,10 +207,12 @@ class Auth0AsgiMiddleware:
 
     async def _send_unauthorized(self, send: Send, error: str | None = None) -> None:
         if error is None:
-            challenge = build_www_authenticate(self._metadata_url)
+            challenge = build_www_authenticate(self._metadata_url, scope=self._challenge_scope)
             message = "Unauthorized"
         else:
-            challenge = build_www_authenticate(self._metadata_url, error, _INVALID_DESCRIPTION)
+            challenge = build_www_authenticate(
+                self._metadata_url, error, _INVALID_DESCRIPTION, scope=self._challenge_scope
+            )
             message = f"Unauthorized: {_INVALID_DESCRIPTION}"
         payload = {
             "jsonrpc": "2.0",
