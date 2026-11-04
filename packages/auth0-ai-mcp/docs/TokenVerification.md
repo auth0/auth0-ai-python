@@ -36,11 +36,13 @@ The middleware catches `VerifyAccessTokenError` (imported from `auth0-api-python
 The middleware answers each case as follows:
 
 - No token, a blank `Bearer` value, or any scheme other than `Bearer` - a `401` with a bare challenge of the form `Bearer resource_metadata="<url>"` and no `error`. When `scopes_supported` is set, both `401` challenges also carry `scope="<scopes>"`, the same scopes as the metadata document, so the client knows what to request at login. The body message is "Unauthorized". DPoP is not supported yet, so a `DPoP` authorization is treated as no token.
+- A bearer value with whitespace inside it - the same `401` with `error="invalid_token"`, without calling Auth0.
 - A token that fails verification - a `401` with `error="invalid_token"` and the fixed description "The access token is not valid". The real reason is only written to the server log.
 - A token bound to a DPoP key or a client certificate (it has a `cnf` claim) - the same `401`, even when it is sent as `Bearer`.
 - Auth0 cannot be reached to fetch the signing keys - verification raises `AuthServerUnavailableError` and the middleware returns a `503` with `Retry-After: 5` and no `WWW-Authenticate` challenge, so the client keeps its token and retries.
 - The `domains_resolver` of a prebuilt `api_client` fails - verification raises `DomainsResolverError` and the middleware returns the same `503`, with a warning in the server log.
 - Any other `VerifyAccessTokenError` - a `401`. Any other exception propagates to the framework.
+- Every `401` and `503` response carries `Cache-Control: no-store`, so a proxy never caches an auth failure.
 - A WebSocket connection - closed with code 1008.
 - An `OPTIONS` request - passes through to the app without verification.
 

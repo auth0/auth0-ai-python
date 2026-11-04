@@ -29,7 +29,7 @@ async def list_calendar_events() -> str:
     # use token_set["access_token"] to call the Google API
 ```
 
-The returned `TokenSet` carries `access_token` and `expires_at`, plus `granted_scopes` when the token response carried a `scope`. Token Vault results are not downscope-checked (see [Downscope protection](./OnBehalfOf.md#downscope-protection)). If the returned token is already expired, `get_token_for_connection` raises `GetAccessTokenForConnectionError`.
+The returned `TokenSet` carries `access_token` and `expires_at`, plus `granted_scopes` when the token response carried a `scope`. Token Vault results are not downscope-checked (see [Downscope protection](./OnBehalfOf.md#downscope-protection)). If the returned token is already expired or has no usable expiry, `get_token_for_connection` raises `GetAccessTokenForConnectionError`.
 
 The scope in `with_required_scopes` must be in the caller's token (see [ScopeEnforcement.md](ScopeEnforcement.md#tenant-side-setup-scopes-must-be-in-the-client-grant)). The user must also have linked a Google account first, or the exchange fails with HTTP 401 `federated_connection_refresh_token_not_found`. In the SDK it arrives as an `ApiError` with that value in `code`, so a tool can match on it. See [Linking an account](#linking-an-account).
 

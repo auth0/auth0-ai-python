@@ -29,7 +29,7 @@ src/auth0_ai_mcp/
   errors.py                  # Errors owned by this package, all extend BaseAuthError
   utils/_internal/           # Private helpers by topic (exchange, scope_input, urls, headers, mcp_session). A public helper is a plain-named file in utils/
 tests/
-  test_client.py, test_middleware.py, test_principal.py, test_request_context.py, test_scopes.py
+  test_client.py, test_middleware.py, test_principal.py, test_request_context.py, test_scopes.py, test_docs.py
 docs/                        # Hand-written guides, linked from README (see references/docs-update.md)
 examples/b2b_ecommerce/      # Runnable server (server.py, tools.py, token_store.py) with its own README
 README.md, EXAMPLES.md
@@ -82,7 +82,7 @@ Token verification, the OBO exchange, caching, and token stores live in auth0-ap
 ## Security Considerations
 
 - **Verification is delegated:** every token goes through `McpServerClient.verify_access_token`, which calls the core SDK. Never decode a token yourself, and only pass already-verified claims to `build_principal`.
-- **Fail closed in the middleware:** a missing, blank or non-Bearer token gets a `401` with a bare challenge, and a token that fails verification (including a claim set `build_principal` rejects) gets a `401` with `invalid_token`. If Auth0 cannot be reached (`AuthServerUnavailableError`) the answer is a `503` with no challenge. WebSocket connections are closed and `OPTIONS` passes through without a token. The tool never runs, so keep it that way for any new rejection path.
+- **Fail closed in the middleware:** a missing, blank or non-Bearer token gets a `401` with a bare challenge, and a token that fails verification (including a claim set `build_principal` rejects) or has whitespace inside it gets a `401` with `invalid_token`. Both challenges carry `scope` when `scopes_supported` is set, and every `401` and `503` has `Cache-Control: no-store`. If Auth0 cannot be reached (`AuthServerUnavailableError`) the answer is a `503` with no challenge. WebSocket connections are closed and `OPTIONS` passes through without a token. The tool never runs, so keep it that way for any new rejection path.
 - **Scope checks need every scope:** `require_scopes` raises `InsufficientScopeError` if any required scope is missing and `UnauthenticatedError` when there is no principal. `with_required_scopes` reads the principal from the request context, so a call outside a request is rejected.
 - **Downscope detection:** `exchange.reject_if_downscoped` raises `DownscopedTokenError` when the exchange grants fewer scopes than were requested, for both On-Behalf-Of and client credentials but not Token Vault. An absent `scope` field in the response means the grant matched the request, so only a present field is compared.
 - **Expired results are rejected:** after every exchange `exchange.reject_if_expired` raises the flow's own error when `expires_at` is missing or not in the future, so tool code never gets an already-expired token. Any leeway for clock skew belongs in the core SDK.

@@ -4,7 +4,7 @@ Before changing a flow, read its entry points and supporting helpers. `McpServer
 
 | Flow | Entry points | Also read | Docs |
 |------|--------------|-----------|------|
-| Request verification | `Auth0AsgiMiddleware.__call__` (`middleware.py`) | `bearer_token` (`utils/_internal/headers.py`), `_send_unauthorized`, `_send_unavailable`, `McpServerClient.verify_access_token`, `build_principal`, `errors.py` | `README.md` "How it works", `docs/TokenVerification.md`, `EXAMPLES.md` "Wiring the ASGI adapter" |
+| Request verification | `Auth0AsgiMiddleware.__call__` (`middleware.py`) | `bearer_token`, `is_well_formed_token` (`utils/_internal/headers.py`), `_send_unauthorized`, `_send_unavailable`, `McpServerClient.verify_access_token`, `build_principal`, `errors.py` | `README.md` "How it works", `docs/TokenVerification.md`, `EXAMPLES.md` "Wiring the ASGI adapter" |
 | Caller identity | `build_principal`, `Principal` (`principal.py`) | `RequestContext`, `bind_request_context`, `set_request_context`, `reset_request_context`, `get_caller_principal`, `require_caller_principal` (`request_context.py`) | `docs/TokenVerification.md`, `docs/RequestContext.md` |
 | Protected-resource metadata | `build_protected_resource_metadata` (`middleware.py`) | `Auth0AsgiMiddleware.__init__`, `_PRM_PATH` | `docs/WritingAnAdapter.md` step 4 |
 | Scope enforcement | `require_scopes`, `with_required_scopes` (`scopes.py`) | `UnauthenticatedError`, `InsufficientScopeError`, `get_caller_principal` | `docs/ScopeEnforcement.md`, `EXAMPLES.md` "Writing a gated tool" |
@@ -15,6 +15,6 @@ Before changing a flow, read its entry points and supporting helpers. `McpServer
 | Organization policy | `create_mcp_client(organization_policy=..., organization_id=...)` | `Principal.org_id` | `docs/OrganizationPolicy.md` |
 | Request context | `bind_request_context`, `require_caller_principal`, `get_caller_mcp_client`, `require_caller_mcp_client` (`request_context.py`) | `RequestScopedMcpClient` (`request_scoped_client.py`) | `docs/RequestContext.md` |
 
-Tests: `tests/test_client.py` covers the exchange, client credentials, Token Vault, and constructor wiring. `tests/test_principal.py` covers claim normalization, `tests/test_scopes.py` covers scope enforcement, `tests/test_request_context.py` covers the request context, and `tests/test_middleware.py` covers the ASGI middleware and the metadata document.
+Tests: `tests/test_client.py` covers the exchange, client credentials, Token Vault, and constructor wiring. `tests/test_principal.py` covers claim normalization, `tests/test_scopes.py` covers scope enforcement, `tests/test_request_context.py` covers the request context, `tests/test_middleware.py` covers the ASGI middleware and the metadata document, and `tests/test_docs.py` checks that doc snippets parse and import real names.
 
 Two rules cut across every flow. Fail closed with a typed error or a `401` on every failure path, and never let tool code see the raw incoming token.
