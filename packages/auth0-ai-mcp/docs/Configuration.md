@@ -70,7 +70,7 @@ The middleware reads the resource from the client's `audience` and the authoriza
 - `mcp_client` - the client from `create_mcp_client`.
 - `resource_url` (str | None, default `None`) - absolute http or https URL of the protected resource. Defaults to the client's `audience` and must equal it when given, otherwise `ConfigurationError` is raised.
 - `authorization_servers` (list[str] | None, default `None`) - issuer URLs to advertise, each an absolute https URL. Defaults to the client's `domain`. Required when the client has no single `domain`, for example a prebuilt `api_client` in multi-domain mode.
-- `scopes_supported` (list[str] | None, default `None`) - scopes to advertise, so the MCP client requests them at login.
+- `scopes_supported` (list[str] | None, default `None`) - scopes to advertise, so the MCP client requests them at login. It must be a list, and a bare string, or an entry that is blank or contains whitespace, raises `ConfigurationError`. An empty list advertises nothing.
 - `resource_name` (str | None, default `None`) - human-readable name for the resource.
 - `resource_documentation` (str | None, default `None`) - URL of documentation for the resource.
 

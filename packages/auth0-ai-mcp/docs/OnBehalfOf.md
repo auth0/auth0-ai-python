@@ -51,7 +51,7 @@ Client credentials runs the same check (see below). Token Vault does not, becaus
 
 ## Expired results
 
-If the exchanged token comes back already expired, `get_token_on_behalf_of` raises `GetTokenByExchangeProfileError`.
+If the exchanged token comes back already expired or without a usable expiry, `get_token_on_behalf_of` raises `GetTokenByExchangeProfileError` with a message that says which.
 
 ## Caching
 
@@ -66,6 +66,6 @@ token = await auth0.get_client_credentials_token(audience="https://internal-api/
 # use token["access_token"]
 ```
 
-The result has the same `TokenSet` shape, including `granted_scopes`. It runs the same downscope check and raises `DownscopedTokenError`, and it raises `GetClientCredentialsTokenError` when the token is already expired.
+The result has the same `TokenSet` shape, including `granted_scopes`. It runs the same downscope check and raises `DownscopedTokenError`, and it raises `GetClientCredentialsTokenError` when the token is already expired or has no usable expiry.
 
 `scope` does not narrow this token. Auth0 returns the full grant of the client, so the downscope check cannot fire when the token carries more scopes than requested, and a scope the client was not granted is refused. Keep the client grant minimal.
