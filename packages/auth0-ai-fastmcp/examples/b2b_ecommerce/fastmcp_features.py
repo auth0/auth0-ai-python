@@ -16,7 +16,7 @@ class CallerAuditMiddleware(Middleware):
 
     async def on_call_tool(self, context: MiddlewareContext, call_next):
         principal = get_caller_principal()
-        logger.info("tool=%s caller=%s", context.message.name, principal.sub if principal else None)
+        logger.info("tool=%r caller=%s", context.message.name, principal.sub if principal else None)
         return await call_next(context)
 
 
