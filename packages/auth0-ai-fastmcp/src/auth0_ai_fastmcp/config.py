@@ -25,7 +25,7 @@ class Auth0FastMCPOptions:
         tool_scopes: Scopes advertised in the metadata so the client requests them at login. `required_scopes` are advertised too.
         client_id: Needed for the on-behalf-of exchange, client credentials tokens and Token Vault. Token verification works without it.
         client_secret: Needed alongside `client_id` for the same flows.
-        token_store: Backing store for cached OBO tokens. Nothing is cached without one.
+        token_store: Backing store for cached exchange tokens (On-Behalf-Of, client credentials and Token Vault). Nothing is cached without one.
         scope_matching: OBO cache scope-matching mode, "strict" or "non_strict".
         organization_policy: "allow" or "required".
         organization_id: Organization id or ids accepted when the policy is "required".
@@ -50,6 +50,10 @@ class _Auth0Provider(Auth0MCPProvider):
     def get_middleware(self) -> list:
         return [Middleware(outage.ServiceUnavailableMiddleware), *super().get_middleware()]
 
+    def get_challenge_scopes(self, required_scopes: list[str] | None = None) -> list[str]:
+        # Without this the 401 challenge lists only required_scopes and a client never asks for tool_scopes.
+        return self.scopes_supported if required_scopes is None else required_scopes
+
 
 class Auth0FastMCP:
     """Builds the McpServerClient, FastMCP auth provider, and context middleware from options.
@@ -58,6 +62,7 @@ class Auth0FastMCP:
 
     Raises:
         ConfigurationError: If `domain` is not a bare host, or `resource_url` is not an absolute http or https URL or holds a query, fragment or credentials.
+        ConfigurationError: If `tool_scopes` or `required_scopes` is not a list of non-empty strings without whitespace.
         ConfigurationError: If `mcp_path` does not start with "/" or holds a query or fragment, or `audience` differs from `resource_url` plus `mcp_path`.
         ConfigurationError: If the core client rejects the options (for example `organization_id` with policy "allow"), or FastMCP is later given a different path than `mcp_path`.
     """
@@ -65,6 +70,9 @@ class Auth0FastMCP:
     def __init__(self, options: Auth0FastMCPOptions) -> None:
         self._options = options
         validation.require_bare_domain(options.domain)
+        validation.require_scope_list("tool_scopes", options.tool_scopes)
+        if options.required_scopes is not None:
+            validation.require_scope_list("required_scopes", options.required_scopes)
         audience = validation.resolve_audience(options.resource_url, options.mcp_path, options.audience)
         self._mcp_client = create_mcp_client(
             options.domain,

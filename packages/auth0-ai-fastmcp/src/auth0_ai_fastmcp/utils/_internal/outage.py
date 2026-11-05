@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 _BODY = json.dumps(
     {
         "jsonrpc": "2.0",
-        "error": {"code": -32002, "message": "Service unavailable: the token could not be verified"},
+        "error": {"code": -32003, "message": "Service unavailable: the token could not be verified"},
         "id": None,
     }
 ).encode()

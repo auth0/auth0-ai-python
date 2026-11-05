@@ -1,8 +1,10 @@
 """Tests for Auth0FastMCP wiring. Network-touching pieces are mocked so this stays offline."""
 
 import importlib.metadata
+from contextlib import contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import httpx
 import pytest
 from auth0_ai_mcp import (
     AuthServerUnavailableError,
@@ -12,6 +14,7 @@ from auth0_ai_mcp import (
     get_caller_mcp_client,
     get_caller_principal,
 )
+from auth0_api_python.token_utils import PRIVATE_JWK, generate_token, generate_token_with_cnf
 from fastmcp import FastMCP
 from starlette.testclient import TestClient
 
@@ -320,6 +323,40 @@ def test_a_domain_that_is_not_a_bare_host_is_rejected(domain):
     mock_provider.assert_not_called()
 
 
+@pytest.mark.parametrize("field", ["tool_scopes", "required_scopes"])
+@pytest.mark.parametrize("scopes", ["read:a", "read:a write:a", ("read:a",), [""], ["read:a write:a"], [" read:a"], ["read:a", 5]])
+def test_a_scope_list_that_is_not_a_list_of_plain_scopes_is_rejected(field, scopes):
+    with patch("auth0_ai_fastmcp.config.create_mcp_client") as mock_create:
+        with patch("auth0_ai_fastmcp.config._Auth0Provider"):
+            with pytest.raises(ConfigurationError, match=field):
+                Auth0FastMCP(_options(**{field: scopes}))
+
+    mock_create.assert_not_called()
+
+
+def test_tool_scopes_of_none_is_rejected():
+    with patch("auth0_ai_fastmcp.config.create_mcp_client"):
+        with patch("auth0_ai_fastmcp.config._Auth0Provider"):
+            with pytest.raises(ConfigurationError, match="tool_scopes"):
+                Auth0FastMCP(_options(tool_scopes=None))
+
+
+def test_the_401_challenge_asks_the_client_for_the_tool_scopes():
+    auth0, _ = _build_with_real_provider(tool_scopes=["tool:a", "tool:b"], required_scopes=["read:c"])
+    app = FastMCP(name="test", auth=auth0.provider).http_app()
+
+    response = TestClient(app).post("/mcp", json=_INITIALIZE)
+
+    assert response.status_code == 401
+    assert 'scope="tool:a tool:b read:c"' in response.headers["www-authenticate"]
+
+
+def test_challenge_scopes_for_an_explicit_scope_list_are_that_list():
+    auth0, _ = _build_with_real_provider(tool_scopes=["tool:a"], required_scopes=["read:c"])
+
+    assert auth0.provider.get_challenge_scopes(["only:this"]) == ["only:this"]
+
+
 def test_required_scopes_reach_the_provider():
     oidc = MagicMock(
         issuer="https://tenant.auth0.com/", jwks_uri="https://tenant.auth0.com/.well-known/jwks.json"
@@ -428,7 +465,7 @@ def test_request_gets_503_not_401_when_auth0_cannot_be_reached():
     assert response.headers["retry-after"] == "5"
     assert response.headers["cache-control"] == "no-store"
     assert "www-authenticate" not in response.headers
-    assert response.json()["error"]["code"] == -32002
+    assert response.json()["error"]["code"] == -32003
 
 
 def test_outage_on_a_non_mcp_path_also_gets_503():
@@ -585,3 +622,64 @@ def test_the_legacy_sse_message_route_requires_a_token():
         response = client.post("/messages/?session_id=abc", json=ping)
 
     assert response.status_code == 401
+
+
+_PUBLIC_JWK = {key: PRIVATE_JWK[key] for key in ("kty", "alg", "use", "kid", "n", "e")}
+_AUDIENCE = "https://api.example.com/mcp"
+
+
+@contextmanager
+def _real_core_client(jwks_error=None):
+    """Runs the real McpServerClient, with only the two HTTP fetches to the tenant replaced."""
+    metadata = {"issuer": "https://tenant.auth0.com/", "jwks_uri": "https://tenant.auth0.com/.well-known/jwks.json"}
+    jwks = AsyncMock(side_effect=jwks_error) if jwks_error else AsyncMock(return_value=({"keys": [_PUBLIC_JWK]}, None))
+    with patch("auth0_api_python.api_client.fetch_oidc_metadata", AsyncMock(return_value=(metadata, None))):
+        with patch("auth0_api_python.api_client.fetch_jwks", jwks):
+            yield
+
+
+def _initialize_with_real_core_client(token, **options):
+    oidc = MagicMock(issuer="https://tenant.auth0.com/", jwks_uri="https://tenant.auth0.com/.well-known/jwks.json")
+    with patch("fastmcp.server.auth.providers.auth0.OIDCConfiguration.get_oidc_configuration", return_value=oidc):
+        auth0 = Auth0FastMCP(_options(scope_matching="strict", organization_policy="allow", organization_id=None, **options))
+    server = FastMCP(name="test", auth=auth0.provider, middleware=[auth0.middleware])
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/json, text/event-stream"}
+    with TestClient(server.http_app(stateless_http=True), raise_server_exceptions=False) as client:
+        return client.post("/mcp", headers=headers, json=_INITIALIZE)
+
+
+async def test_a_real_signed_token_for_this_audience_is_accepted():
+    token = await generate_token("tenant.auth0.com", "alice", _AUDIENCE, claims={"azp": "app", "scope": "tool:a"})
+
+    with _real_core_client():
+        response = _initialize_with_real_core_client(token)
+
+    assert response.status_code == 200
+
+
+async def test_a_real_signed_token_for_another_audience_gets_401():
+    token = await generate_token("tenant.auth0.com", "alice", "https://other.example.com/mcp", claims={"azp": "app"})
+
+    with _real_core_client():
+        response = _initialize_with_real_core_client(token)
+
+    assert response.status_code == 401
+
+
+async def test_a_real_signed_token_bound_to_a_proof_key_gets_401():
+    token = await generate_token_with_cnf("tenant.auth0.com", "alice", _AUDIENCE, claims={"azp": "app"})
+
+    with _real_core_client():
+        response = _initialize_with_real_core_client(token)
+
+    assert response.status_code == 401
+
+
+async def test_a_real_client_that_cannot_fetch_the_signing_keys_gets_503():
+    token = await generate_token("tenant.auth0.com", "alice", _AUDIENCE, claims={"azp": "app"})
+
+    with _real_core_client(jwks_error=httpx.ConnectError("unreachable")):
+        response = _initialize_with_real_core_client(token)
+
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"

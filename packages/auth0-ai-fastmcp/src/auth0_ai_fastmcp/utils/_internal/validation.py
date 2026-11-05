@@ -15,6 +15,15 @@ def require_bare_domain(domain: str) -> None:
         raise ConfigurationError("domain must be a bare host such as tenant.auth0.com, with no scheme, path, query or whitespace")
 
 
+def require_scope_list(name: str, scopes: object) -> None:
+    """Reject a scope list that would be advertised or enforced wrongly, such as a bare string or an entry holding a space."""
+    if not isinstance(scopes, list):
+        raise ConfigurationError(f"{name} must be a list of scope strings")
+    for scope in scopes:
+        if not isinstance(scope, str) or not scope or any(ch.isspace() for ch in scope):
+            raise ConfigurationError(f"{name} entries must be non-empty strings with no whitespace, so pass one scope per entry")
+
+
 def resolve_audience(resource_url: str, mcp_path: str, audience: str | None) -> str:
     """Return the audience, defaulting to the resource FastMCP advertises, which tokens must carry as `aud`."""
     try:
