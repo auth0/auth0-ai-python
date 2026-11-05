@@ -10,7 +10,7 @@ packages = [{ include = "auth0_ai_fastmcp", from = "src" }]
 
 [tool.poetry.dependencies]
 python = ">=3.10,<4.0"
-fastmcp = "^4.0.10"
+fastmcp = ">=4.0.10"
 # Path dependency while reviewed with auth0-ai-mcp, becomes a version range once it is released.
 auth0-ai-mcp = { path = "../auth0-ai-mcp", develop = true }
 

@@ -45,7 +45,7 @@ jobs:
           while read -r file; do
             case "$file" in
               .github/workflows/test.yml) mcp=true; fast=true ;;
-              packages/auth0-ai-mcp/*) mcp=true ;;
+              packages/auth0-ai-mcp/*) mcp=true; fast=true ;;
               packages/auth0-ai-fastmcp/*) fast=true ;;
             esac
           done <<< "$files"
@@ -98,6 +98,46 @@ jobs:
 
     - name: Install package
       run: poetry install --no-interaction
+
+    - name: Run tests with pytest
+      run: |
+        poetry run pytest -v
+
+    - name: Run ruff linting
+      run: |
+        poetry run ruff check .
+
+  test-latest-fastmcp:
+    name: test (auth0-ai-fastmcp, newest FastMCP)
+    needs: changes
+    if: contains(needs.changes.outputs.packages, 'auth0-ai-fastmcp')
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/auth0-ai-fastmcp
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+    - name: Set up Python
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+      with:
+        python-version: "3.14"
+
+    - name: Install Poetry
+      uses: snok/install-poetry@a783c322200f0519c7926aa6faa857c4e23e9263 # v1.4.2
+      with:
+        version: "2.4.1"
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+        installer-parallel: true
+
+    - name: Install the newest FastMCP the version range allows
+      run: |
+        poetry install --no-interaction --no-root
+        poetry update fastmcp --no-interaction
+        poetry install --no-interaction
 
     - name: Run tests with pytest
       run: |
