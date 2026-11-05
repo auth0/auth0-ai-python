@@ -8,6 +8,7 @@ from auth0_ai_mcp import (
     ApiError,
     DownscopedTokenError,
     UnauthenticatedError,
+    VerifyAccessTokenError,
     get_caller_mcp_client,
     get_caller_principal,
 )
@@ -102,7 +103,7 @@ async def test_missing_token_is_rejected_and_handler_is_not_run(method):
     assert call_next.seen is None
 
 
-@pytest.mark.parametrize("method", ["initialize", "ping"])
+@pytest.mark.parametrize("method", ["initialize", "ping", "server/discover"])
 async def test_lifecycle_requests_pass_through_without_a_token(method):
     stub = StubMcpClient()
     call_next = Recorder()
@@ -113,6 +114,35 @@ async def test_lifecycle_requests_pass_through_without_a_token(method):
     assert result == "result"
     assert call_next.seen == (None, None)
     assert stub.bound == []
+
+
+async def test_caller_is_visible_inside_a_resource_and_a_prompt():
+    async def whoami_resource() -> str:
+        return get_caller_principal().sub
+
+    async def whoami_prompt() -> str:
+        return get_caller_principal().sub
+
+    server = FastMCP(name="test", middleware=[Auth0ContextMiddleware(StubMcpClient())])
+    server.resource("res://whoami")(whoami_resource)
+    server.prompt(whoami_prompt)
+    with _patch_token(_access_token()):
+        async with Client(server) as client:
+            resource = await client.read_resource("res://whoami")
+            prompt = await client.get_prompt("whoami_prompt")
+
+    assert resource[0].text == "u"
+    assert prompt.messages[0].content.text == "u"
+
+
+async def test_claims_that_build_principal_rejects_never_reach_the_handler():
+    call_next = Recorder()
+
+    with _patch_token(_access_token({"azp": "cid", "exp": 9999})):
+        with pytest.raises(VerifyAccessTokenError):
+            await Auth0ContextMiddleware(StubMcpClient()).on_request(_context(), call_next)
+
+    assert call_next.seen is None
 
 
 _API_ERROR = ApiError("federated_connection_refresh_token_not_found", "tenant detail XYZ", 401)
@@ -260,3 +290,43 @@ async def test_other_resource_and_prompt_errors_are_left_to_fastmcp():
     assert await _get_prompt_raising(RuntimeError("internal detail")) == (
         "Error rendering prompt 'boom': internal detail"
     )
+
+
+async def test_failed_exchange_in_a_mounted_server_is_still_shortened():
+    async def boom() -> str:
+        raise _API_ERROR
+
+    child = FastMCP(name="child")
+    child.tool(boom)
+    parent = FastMCP(name="parent", middleware=[Auth0ContextMiddleware(StubMcpClient())])
+    parent.mount(child, namespace="child")
+    with _patch_token(_access_token()):
+        async with Client(parent) as client:
+            result = await client.call_tool("child_boom", {}, raise_on_error=False)
+
+    assert result.content[0].text == "Token exchange failed (federated_connection_refresh_token_not_found)"
+
+
+async def test_failed_exchange_in_a_mounted_resource_and_prompt_is_still_shortened():
+    async def boom_resource() -> str:
+        raise _API_ERROR
+
+    async def boom_prompt() -> str:
+        raise _API_ERROR
+
+    child = FastMCP(name="child")
+    child.resource("res://boom")(boom_resource)
+    child.prompt(boom_prompt)
+    parent = FastMCP(name="parent", middleware=[Auth0ContextMiddleware(StubMcpClient())])
+    parent.mount(child, namespace="child")
+    expected = "Token exchange failed (federated_connection_refresh_token_not_found)"
+    with _patch_token(_access_token()):
+        async with Client(parent) as client:
+            resources = await client.list_resources()
+            with pytest.raises(Exception) as resource_error:
+                await client.read_resource(str(resources[0].uri))
+            with pytest.raises(Exception) as prompt_error:
+                await client.get_prompt("child_boom_prompt")
+
+    assert str(resource_error.value) == expected
+    assert str(prompt_error.value) == expected
