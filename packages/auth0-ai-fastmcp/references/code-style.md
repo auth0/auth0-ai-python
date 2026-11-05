@@ -9,7 +9,7 @@
 
 ## Errors
 
-This package defines no error classes of its own. `Auth0TokenVerifier` turns `VerifyAccessTokenError` into a rejected token and re-raises `AuthServerUnavailableError`. `Auth0ContextMiddleware` raises `UnauthenticatedError` when a request has no verified token. Do not wrap core SDK errors.
+This package defines no public error classes. `scopes.py` has two private `ToolError` subclasses that extend the core scope errors so a denial reaches the client as a tool error. `Auth0TokenVerifier` turns `VerifyAccessTokenError` into a rejected token and re-raises `AuthServerUnavailableError`. `Auth0ContextMiddleware` raises `UnauthenticatedError` when a request has no verified token. Do not wrap core SDK errors.
 
 Keep messages generic when they reach a client, and never put token material or scope lists in them. The one exception is the `403` FastMCP sends for `required_scopes`, which names the missing scope and is not written by this package.
 
