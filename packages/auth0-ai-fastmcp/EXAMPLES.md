@@ -20,7 +20,7 @@ from auth0_ai_mcp import get_caller_principal, require_caller_mcp_client
 auth0 = Auth0FastMCP(Auth0FastMCPOptions(
     domain="your-tenant.auth0.com",
     resource_url="https://your-api.example.com",
-    tool_scopes=["tool:read_orders", "tool:place_order"],
+    tool_scopes=["tool:read_orders", "tool:place_order", "resource:recent_orders", "prompt:order_summary"],
     client_id="YOUR_CLIENT_ID",
     client_secret="YOUR_CLIENT_SECRET",
 ))
@@ -59,7 +59,7 @@ For what each `Auth0FastMCPOptions` field does, see [Configuration](./docs/Confi
 
 ## Resources and prompts
 
-The middleware sets the caller for resources and prompts too. Check the scope with `require_scopes` inside the handler, or put `with_required_scopes` on the handler as it is on a tool.
+The middleware sets the caller for resources and prompts too. Check the scope with `require_scopes` inside the handler, or put `with_required_scopes` on the handler as it is on a tool. The scopes used here are in `tool_scopes` in the full server above, so the MCP client requests them at login.
 
 ```python
 @mcp.resource("orders://recent")
