@@ -26,4 +26,4 @@ poetry run pytest tests/test_middleware.py -k token # filter by name
 
 - `StubMcpClient` in `tests/test_verifier.py` stands in for `McpServerClient`. It returns a `VerifiedToken` with the claims a test chooses, or raises the error a test chooses.
 - `tests/test_middleware.py` patches `get_access_token` in the middleware module to control whether a request has a verified token. Its `Recorder` is a `call_next` that records the caller visible while the request runs, so a test can assert on both the bound context and its reset afterwards.
-- `tests/test_config.py` patches `create_mcp_client` and `Auth0MCPProvider` to stay offline. Where a test needs the real provider, it patches `OIDCConfiguration.get_oidc_configuration` instead.
+- `tests/test_config.py` patches `create_mcp_client` and `config._Auth0Provider` to stay offline. Where a test needs the real provider, it patches `OIDCConfiguration.get_oidc_configuration` instead.

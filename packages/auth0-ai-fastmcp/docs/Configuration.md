@@ -18,7 +18,7 @@ mcp = FastMCP(name="My MCP Server", auth=auth0.provider)
 mcp.add_middleware(auth0.middleware)
 ```
 
-Settings are checked when `Auth0FastMCP(options)` runs, so a bad combination fails at server startup rather than on the first request.
+The domain, scope lists, audience, mount path and scope matching are checked when `Auth0FastMCP(options)` runs, so a bad value fails at server startup rather than on the first request. `client_id` and `client_secret` are not checked at startup.
 
 ## Auth0FastMCPOptions fields
 
@@ -27,7 +27,7 @@ Settings are checked when `Auth0FastMCP(options)` runs, so a bad combination fai
 - `audience` (str | None, default `None`) - this server's API identifier in Auth0, which incoming tokens are validated against. Defaults to `resource_url` plus `mcp_path` and must equal it when set. See [resource_url and audience](#resource_url-and-audience).
 - `mcp_path` (str, default `"/mcp"`) - path the MCP endpoint is mounted at. See [resource_url and audience](#resource_url-and-audience).
 - `tool_scopes` (list[str], default `[]`) - scopes advertised so the MCP client requests them at login. See [Tool Scopes](./ToolScopes.md).
-- `client_id` (str | None, default `None`) - client id for token exchanges, needed only when tools call `get_token_on_behalf_of`, `get_client_credentials_token` or `get_token_for_connection`.
+- `client_id` (str | None, default `None`) - client id for token exchanges, needed only when tools call `get_token_on_behalf_of`, `get_client_credentials_token` or `get_token_for_connection`. Leaving them out is not an error at startup, and a tool that needs them fails at its first exchange with `Client credentials are required to use get_token_by_exchange_profile`.
 - `client_secret` (str | None, default `None`) - client secret for the same exchanges.
 - `token_store` (AbstractTokenStore | None, default `None`) - backing store for cached OBO tokens. See [Scope matching for cached OBO tokens](#scope-matching-for-cached-obo-tokens).
 - `scope_matching` (str, default `"strict"`) - how cached OBO tokens are matched to the scopes a tool asks for, either `"strict"` or `"non_strict"`. See [Scope matching for cached OBO tokens](#scope-matching-for-cached-obo-tokens).
@@ -40,6 +40,8 @@ Settings are checked when `Auth0FastMCP(options)` runs, so a bad combination fai
 `resource_url` is the base URL of your server with no MCP path on the end. FastMCP adds the path the MCP endpoint is mounted at (`/mcp` by default) and advertises the result as the resource in the protected-resource metadata.
 
 The MCP client reads that advertised resource and asks Auth0 for a token for it, so the audience that incoming tokens are validated against has to be the same value. It defaults to `resource_url` plus `mcp_path`, which means `resource_url="https://your-api.example.com"` gives the audience `https://your-api.example.com/mcp`. That value is also the API identifier to register in Auth0.
+
+The tenant also needs the `compatibility` resource parameter profile, the scopes added to that API as permissions, and a client grant for the MCP client. See [What you need on the tenant](../examples/b2b_ecommerce/README.md#what-you-need-on-the-tenant) for the commands.
 
 Set `mcp_path` if the server is mounted somewhere other than `/mcp`, and pass the same path to FastMCP. You can set `audience` yourself, but it must equal `resource_url` plus `mcp_path`. Any other value raises `ConfigurationError` at startup, because tokens minted for it would never match the advertised resource. If the path given to `http_app` or `run` differs from `mcp_path`, building the app raises the same error.
 
@@ -78,7 +80,9 @@ Caching is off unless you set `token_store`, along with `client_id` and `client_
 > With `non_strict`, a tool can get a token with more access than it asked for. A tool that asks for `read:inventory` can be handed a saved token that also carries `write:inventory`. Only choose it when that is acceptable for every tool on the server.
 
 ```python
-store = YourIndexedTokenStore(secret="YOUR_STORE_SECRET")  # your IndexedTokenStore subclass
+import os
+
+store = YourIndexedTokenStore(secret=os.environ["TOKEN_STORE_SECRET"])  # your IndexedTokenStore subclass, secret of at least 32 characters
 
 Auth0FastMCPOptions(
     domain="your-tenant.auth0.com",
@@ -98,8 +102,9 @@ See [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/
 `required_scopes` applies to every request on the server, whatever the tool, resource or prompt. It is separate from `tool_scopes`, which only advertises scopes for the client to ask for at login. For how required scopes are advertised, see [Tool Scopes](./ToolScopes.md). For which token claim scopes are read from, see [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md).
 
 - An invalid, expired or empty token is rejected by `Auth0TokenVerifier`, and FastMCP answers `401`.
+- A token bound to a DPoP key or a client certificate (it has a `cnf` claim) is rejected the same way with `invalid_token`, because it cannot be used as a Bearer token.
 - A valid token that lacks a required scope gets a `403` with `insufficient_scope`. The text names the missing scope (`Required scope: <scope>`) because the official `mcp` SDK writes it.
-- If Auth0 cannot be reached to check a token, the verifier raises `AuthServerUnavailableError` instead of reporting the token as bad. The server answers `503` with `Retry-After: 5` and `Cache-Control: no-store` headers and no `WWW-Authenticate` challenge, so the client keeps its token and retries instead of logging in again. This applies to the provider from `Auth0FastMCP` only, a hand-wired provider answers with FastMCP's own `500`.
+- If Auth0 cannot be reached to check a token, the verifier raises `AuthServerUnavailableError` instead of reporting the token as bad. The server answers `503` with `Retry-After: 5` and `Cache-Control: no-store` headers and no `WWW-Authenticate` challenge, so the client keeps its token and can try again instead of logging in again. This applies to the provider from `Auth0FastMCP` only, a hand-wired provider answers with FastMCP's own `500`.
 
 In every case the handler never runs.
 
@@ -109,7 +114,9 @@ This package does not check the `Host` or `Origin` header of a request. FastMCP 
 
 `Auth0ContextMiddleware` runs on every MCP request after the token is verified, including tool calls, resource reads, prompt requests and the list calls. It builds the caller's `Principal` from the verified token and makes it available to `get_caller_principal()` and `require_caller_mcp_client()` for the length of the request. The context is cleared when the request ends, even if the handler raises.
 
-A request with no verified token raises `UnauthenticatedError`. With the provider mounted this does not happen, because FastMCP turns the request away first, so seeing it means the server was created without `auth=auth0.provider`. It is logged with a traceback so the missing provider is easy to spot. The `initialize` and `ping` requests are the exception, since they carry no caller. A token without a usable `sub`, `exp` or client id never counts as verified, so it gets a `401` before the middleware runs.
+A request with no verified token raises `UnauthenticatedError`. Over HTTP with the provider mounted this does not happen, because FastMCP turns the request away first. Seeing it means the request carried no token, for example the server was created without `auth=auth0.provider`, or the request came from an in-memory `Client(mcp)` or over stdio, which have no bearer token. It is logged with a traceback so the cause is easy to spot. The `initialize`, `ping` and `server/discover` requests are the exception, since they carry no caller. A token without a usable `sub`, `exp` or client id never counts as verified, so it gets a `401` before the middleware runs.
+
+To test a tool end to end, run the server over HTTP and send a real access token. An in-memory client cannot pass the middleware.
 
 Tools should read the caller with `get_caller_principal()`. FastMCP's own `get_access_token()` still returns the raw bearer token, because the verifier hands it to FastMCP, so avoid it in tool code.
 
@@ -146,4 +153,4 @@ After construction, `Auth0FastMCP` exposes three read-only properties.
 - `.middleware` - an `Auth0ContextMiddleware`. Register it with `mcp.add_middleware(auth0.middleware)`. It sets the request context so handler code can call `require_caller_mcp_client()` and `get_caller_principal()`. See [What the middleware does](#what-the-middleware-does).
 - `.mcp_client` - the underlying `auth0-ai-mcp` `McpServerClient`, for advanced cases that need direct access to the core client.
 
-`Auth0TokenVerifier` and `Auth0ContextMiddleware` are also exported directly from `auth0_ai_fastmcp`, for cases where you want to hand-wire the provider yourself instead of using `Auth0FastMCP`.
+`Auth0TokenVerifier` and `Auth0ContextMiddleware` are also exported directly from `auth0_ai_fastmcp`, for cases where you want to hand-wire the provider yourself instead of using `Auth0FastMCP`. Pass `required_scopes` to `Auth0TokenVerifier`, because the provider ignores its own `required_scopes` once a `token_verifier` is given. A hand-wired provider also gets no mount-path check at startup and no `503` answer when Auth0 is down.
