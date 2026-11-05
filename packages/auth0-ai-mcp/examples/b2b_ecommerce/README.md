@@ -298,6 +298,7 @@ token. Create the analytics API and let the OBO client use client credentials ag
 # Create the API
 auth0 apis create --name "Analytics Service" \
   --identifier "https://analytics.api/" \
+  --signing-alg RS256 \
   --scopes "read:analytics" \
   --no-input
 
