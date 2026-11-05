@@ -18,13 +18,17 @@ from fastmcp.exceptions import FastMCPError, PromptError, ResourceError, ToolErr
 from fastmcp.server.dependencies import get_access_token
 from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
 
-_METHODS_WITHOUT_CALLER = frozenset({"initialize", "ping"})
+_METHODS_WITHOUT_CALLER = frozenset({"initialize", "ping", "server/discover"})
+
+_TOOL_WRAPPER_PREFIX = "Error calling tool "
+_RESOURCE_WRAPPER_PREFIX = "Error reading resource "
+_PROMPT_WRAPPER_PREFIX = "Error rendering prompt "
 
 
 def _exchange_failure(exc: FastMCPError, wrapper_prefix: str) -> FastMCPError | None:
     """Return the error code only version of `exc` if FastMCP wrapped a failed token exchange, else None."""
     cause = exc.__cause__
-    # FastMCP's own wrapper message starts with this prefix, a handler's own error does not.
+    # Only the generic start is matched, because a mounted child server changes the name in the message.
     if isinstance(cause, ApiError | DownscopedTokenError) and str(exc).startswith(wrapper_prefix):
         return type(exc)(f"Token exchange failed ({cause.get_error_code()})")
     return None
@@ -47,8 +51,8 @@ class Auth0ContextMiddleware(Middleware):
         """Bind the verified caller for the duration of the request.
 
         Raises:
-            UnauthenticatedError: If the request has no verified token. `initialize` and
-                `ping` are exempt because they carry no caller.
+            UnauthenticatedError: If the request has no verified token. `initialize`, `ping` and
+                `server/discover` are exempt because they carry no caller.
             VerifyAccessTokenError: If `build_principal` rejects the verified claims, for example a missing `sub`, `exp` or client id.
                 `Auth0TokenVerifier` already rejects those, so this only fires with a different verifier.
         """
@@ -75,7 +79,7 @@ class Auth0ContextMiddleware(Middleware):
         try:
             return await call_next(context)
         except ToolError as exc:
-            if (replacement := _exchange_failure(exc, f"Error calling tool {context.message.name!r}")) is not None:
+            if (replacement := _exchange_failure(exc, _TOOL_WRAPPER_PREFIX)) is not None:
                 raise replacement from exc.__cause__
             raise
 
@@ -88,7 +92,7 @@ class Auth0ContextMiddleware(Middleware):
         try:
             return await call_next(context)
         except ResourceError as exc:
-            if (replacement := _exchange_failure(exc, f"Error reading resource {str(context.message.uri)!r}")) is not None:
+            if (replacement := _exchange_failure(exc, _RESOURCE_WRAPPER_PREFIX)) is not None:
                 raise replacement from exc.__cause__
             raise
 
@@ -101,6 +105,6 @@ class Auth0ContextMiddleware(Middleware):
         try:
             return await call_next(context)
         except PromptError as exc:
-            if (replacement := _exchange_failure(exc, f"Error rendering prompt {context.message.name!r}")) is not None:
+            if (replacement := _exchange_failure(exc, _PROMPT_WRAPPER_PREFIX)) is not None:
                 raise replacement from exc.__cause__
             raise
