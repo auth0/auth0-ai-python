@@ -165,13 +165,13 @@ The MCP server's own API is the one Claude Code's login token is issued for, so 
 has to match `AUTH0_AUDIENCE`.
 
 ```bash
-auth0 apis create --name "B2B Ecommerce MCP" --identifier "http://localhost:3002/mcp" --signing-alg RS256
-auth0 apis create --name "Orders Service"        --identifier "https://orders.api/"        --signing-alg RS256 --scopes "cancel:orders,read:orders,write:orders"
-auth0 apis create --name "Payments Service"      --identifier "https://payments.api/"      --signing-alg RS256 --scopes "refund:payments"
-auth0 apis create --name "Inventory Service"     --identifier "https://inventory.api/"     --signing-alg RS256 --scopes "read:inventory,write:inventory"
-auth0 apis create --name "Shipping Service"      --identifier "https://shipping.api/"      --signing-alg RS256 --scopes "read:shipments,create:shipments"
-auth0 apis create --name "Customers Service"     --identifier "https://customers.api/"     --signing-alg RS256 --scopes "read:customers,write:customers"
-auth0 apis create --name "Notifications Service" --identifier "https://notifications.api/" --signing-alg RS256 --scopes "send:notifications"
+auth0 apis create --name "B2B Ecommerce MCP" --identifier "http://localhost:3002/mcp" --signing-alg RS256 --no-input
+auth0 apis create --name "Orders Service"        --identifier "https://orders.api/"        --signing-alg RS256 --scopes "cancel:orders,read:orders,write:orders" --no-input
+auth0 apis create --name "Payments Service"      --identifier "https://payments.api/"      --signing-alg RS256 --scopes "refund:payments" --no-input
+auth0 apis create --name "Inventory Service"     --identifier "https://inventory.api/"     --signing-alg RS256 --scopes "read:inventory,write:inventory" --no-input
+auth0 apis create --name "Shipping Service"      --identifier "https://shipping.api/"      --signing-alg RS256 --scopes "read:shipments,create:shipments" --no-input
+auth0 apis create --name "Customers Service"     --identifier "https://customers.api/"     --signing-alg RS256 --scopes "read:customers,write:customers" --no-input
+auth0 apis create --name "Notifications Service" --identifier "https://notifications.api/" --signing-alg RS256 --scopes "send:notifications" --no-input
 ```
 
 Then add the five tool scopes to the MCP API, using the id from its create output.
@@ -298,16 +298,18 @@ token. Create the analytics API and let the OBO client use client credentials ag
 # Create the API
 auth0 apis create --name "Analytics Service" \
   --identifier "https://analytics.api/" \
-  --scopes "read:analytics"
+  --scopes "read:analytics" \
+  --no-input
 
 # Let the OBO client use client credentials against it
 auth0 api post "client-grants" \
   --data '{"client_id":"YOUR_OBO_CLIENT_ID","audience":"https://analytics.api/","scope":["read:analytics"]}'
 ```
 
-The OBO client also needs `client_credentials` in its grant types. The CLI's `apps update` has
-no option for that, so use the Management API. A PATCH replaces the whole list, so look at the
-current list first.
+The OBO client also needs `client_credentials` in its grant types. The CLI's
+`apps update --grants` replaces the whole list and only knows the CLI's own grant names, so this
+uses the Management API instead. A PATCH replaces the whole list too, so look at the current list
+first.
 
 ```bash
 auth0 api get "clients/YOUR_OBO_CLIENT_ID?fields=grant_types"
@@ -360,6 +362,9 @@ listens. Pointing Claude Code at `http://localhost:3002` alone fails with
 claude mcp add --transport http b2b-ecommerce http://localhost:3002/mcp
 ```
 
+Adding the server does not sign you in. Sign in once with `claude mcp login b2b-ecommerce`, or
+run `/mcp` inside Claude Code and choose Authenticate.
+
 ## Adding a new downstream service and tool
 
 Say you want a `returns` service and a `process_return` tool that reads orders and writes a
@@ -368,7 +373,7 @@ return. These are the steps.
 1. Register the service API and its scopes.
 
    ```bash
-   auth0 apis create --name "Returns Service" --identifier "https://returns.api/" --signing-alg RS256 --scopes "read:returns,write:returns"
+   auth0 apis create --name "Returns Service" --identifier "https://returns.api/" --signing-alg RS256 --scopes "read:returns,write:returns" --no-input
    ```
 
 2. Give the OBO client access to it on behalf of users, with the scopes the tool will ask for.
@@ -541,7 +546,7 @@ Use b2b-ecommerce to run the sales analytics report.
 Use b2b-ecommerce to run an order status report for ORD-1042 again.
 ```
 
-The first prompt opens a browser to log in and approve access. After that the tool runs, and
+Once you are signed in, the first prompt runs the tool, and
 behind the scenes the server swaps your one token for an orders token and a payments token.
 The fulfill and status prompts use the token cache. The analytics prompt is
 the M2M tool, so it runs without your token. The repeated status report comes straight from the
