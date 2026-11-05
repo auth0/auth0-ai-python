@@ -343,7 +343,7 @@ async def test_unreachable_auth_server_returns_503_without_a_challenge_and_skips
     assert _status(sent) == 503
     assert _header(sent, b"retry-after") == b"5"
     assert _header(sent, b"www-authenticate") is None
-    assert _body(sent)["error"]["code"] == -32002
+    assert _body(sent)["error"]["code"] == -32003
     assert "Failed to fetch JWKS" not in json.dumps(_body(sent))
     assert "Failed to fetch JWKS" in caplog.text
     assert "secret-tok" not in caplog.text

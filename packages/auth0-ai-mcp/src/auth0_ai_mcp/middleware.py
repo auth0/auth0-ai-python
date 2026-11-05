@@ -235,7 +235,7 @@ class Auth0AsgiMiddleware:
         # No challenge, so the client keeps its token and retries instead of logging in again.
         payload = {
             "jsonrpc": "2.0",
-            "error": {"code": -32002, "message": "Service unavailable: the token could not be verified"},
+            "error": {"code": -32003, "message": "Service unavailable: the token could not be verified"},
             "id": None,
         }
         await self._send_json(
