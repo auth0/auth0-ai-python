@@ -106,7 +106,7 @@ async def test_tool_without_a_caller_shows_the_reason_to_the_client():
     assert result.content[0].text == "No principal in the current request context."
 
 
-async def test_denied_tool_is_logged_without_a_traceback(caplog):
+async def test_denied_tool_is_logged_without_a_traceback():
     server = FastMCP("test")
 
     @server.tool
@@ -114,11 +114,25 @@ async def test_denied_tool_is_logged_without_a_traceback(caplog):
     async def guarded() -> str:
         return "body"
 
-    with caplog.at_level(logging.INFO), bind_request_context(_context(["other"])):
-        await _call(server)
+    records = []
+    handler = logging.Handler()
+    handler.emit = records.append
+    # FastMCP's logger does not propagate to the root, so caplog would never see its records.
+    fastmcp_logger = logging.getLogger("fastmcp")
+    fastmcp_logger.addHandler(handler)
+    previous_level = fastmcp_logger.level
+    fastmcp_logger.setLevel(logging.INFO)
+    try:
+        with bind_request_context(_context(["other"])):
+            await _call(server)
+    finally:
+        fastmcp_logger.removeHandler(handler)
+        fastmcp_logger.setLevel(previous_level)
 
-    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
-    assert not [r for r in caplog.records if r.exc_info]
+    denial = [r for r in records if "guarded" in r.getMessage()]
+    assert len(denial) == 1
+    assert denial[0].levelno == logging.INFO
+    assert not denial[0].exc_info
 
 
 async def test_decorator_placed_above_the_tool_registration_does_not_guard_the_tool():
