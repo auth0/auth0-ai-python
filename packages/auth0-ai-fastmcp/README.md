@@ -4,7 +4,7 @@ It is the FastMCP adapter for [`auth0-ai-mcp`](https://github.com/auth0/auth0-ai
 
 ![Release](https://img.shields.io/pypi/v/auth0-ai-fastmcp) ![Downloads](https://img.shields.io/pypi/dw/auth0-ai-fastmcp) [![License](https://img.shields.io/:license-Apache%202.0-blue.svg?style=flat)](https://opensource.org/licenses/Apache-2.0)
 
-🚀 [Getting Started](#getting-started) - 💬 [Feedback](#feedback)
+📚 [Documentation](#documentation) - 🚀 [Getting Started](#getting-started) - 💬 [Feedback](#feedback)
 
 ## Getting Started
 
@@ -43,10 +43,12 @@ mcp.add_middleware(auth0.middleware)
 > [!IMPORTANT]
 > Both `auth=auth0.provider` and `mcp.add_middleware(auth0.middleware)` are required. Without the middleware, tools cannot read the caller.
 
-The provider checks every incoming token and the middleware makes the verified caller available to your tools, resources and prompts.
+The provider checks every incoming token and the middleware makes the verified caller available to your tools, resources and prompts. See [What the middleware does](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/docs/Configuration.md#what-the-middleware-does).
 
 > [!WARNING]
 > Do not add `/mcp` to the end of `resource_url`. FastMCP appends the MCP path itself.
+
+The tenant also needs the `compatibility` resource parameter profile, the scopes added to the API as permissions, and a client grant for the MCP client. See [What you need on the tenant](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/examples/b2b_ecommerce/README.md#what-you-need-on-the-tenant) for the commands.
 
 ### 3. Gate a tool
 
@@ -65,7 +67,23 @@ async def do_thing() -> str:
 
 ### 4. Gate a resource or prompt
 
-Resources and prompts are gated the same way.
+Resources and prompts are gated the same way. See [Gating resources and prompts](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/docs/ToolScopes.md#gating-resources-and-prompts).
+
+## Documentation
+
+- [Configuration](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/docs/Configuration.md) - all `Auth0FastMCPOptions` fields.
+- [Tool Scopes](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/docs/ToolScopes.md) - how scopes are advertised at login and how tools, resources and prompts are gated.
+- [Examples](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/EXAMPLES.md) - code samples for a full server. The runnable version is [`examples/b2b_ecommerce`](https://github.com/auth0/auth0-ai-python/tree/main/packages/auth0-ai-fastmcp/examples/b2b_ecommerce).
+
+### Core guides
+
+These guides cover the behavior this package builds on. In FastMCP code, import the scope helpers from `auth0_ai_fastmcp` and not from `auth0_ai_mcp`. The `auth0_ai_mcp` versions still deny the call, but with `mask_error_details=True` the client sees only `Error calling tool 'x'` and the server logs an ERROR traceback.
+
+- [On-Behalf-Of](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OnBehalfOf.md) - get a token for a downstream API for the caller.
+- [Token Vault](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenVault.md) - get a token for a third-party provider such as Google.
+- [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenCaching.md) - reuse exchanged tokens with a token store.
+- [Request Context](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/RequestContext.md) - read the caller inside a tool.
+- [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md) - check the caller's scopes before a tool runs.
 
 ## Feedback
 
