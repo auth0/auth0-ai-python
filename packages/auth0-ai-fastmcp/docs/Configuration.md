@@ -18,7 +18,7 @@ mcp = FastMCP(name="My MCP Server", auth=auth0.provider)
 mcp.add_middleware(auth0.middleware)
 ```
 
-The domain, scope lists, audience, mount path and scope matching are checked when `Auth0FastMCP(options)` runs, so a bad value fails at server startup rather than on the first request. `client_id` and `client_secret` are not checked at startup.
+The domain, resource URL, scope lists, audience, mount path, scope matching and organization settings are checked when `Auth0FastMCP(options)` runs, so a bad value fails at server startup rather than on the first request. `client_id` and `client_secret` are not checked at startup.
 
 ## Auth0FastMCPOptions fields
 
@@ -27,7 +27,7 @@ The domain, scope lists, audience, mount path and scope matching are checked whe
 - `audience` (str | None, default `None`) - this server's API identifier in Auth0, which incoming tokens are validated against. Defaults to `resource_url` plus `mcp_path` and must equal it when set. See [resource_url and audience](#resource_url-and-audience).
 - `mcp_path` (str, default `"/mcp"`) - path the MCP endpoint is mounted at. See [resource_url and audience](#resource_url-and-audience).
 - `tool_scopes` (list[str], default `[]`) - scopes advertised so the MCP client requests them at login. See [Tool Scopes](./ToolScopes.md).
-- `client_id` (str | None, default `None`) - client id for token exchanges, needed only when tools call `get_token_on_behalf_of`, `get_client_credentials_token` or `get_token_for_connection`. Leaving them out is not an error at startup, and a tool that needs them fails at its first exchange with `Client credentials are required to use get_token_by_exchange_profile`.
+- `client_id` (str | None, default `None`) - client id for token exchanges, needed only when tools call `get_token_on_behalf_of`, `get_client_credentials_token` or `get_token_for_connection`. Leaving them out is not an error at startup. A tool that needs them fails at its first exchange with an error that names the missing credentials. That error is not rewritten, so with `mask_error_details=True` the client sees only `Error calling tool 'x'`.
 - `client_secret` (str | None, default `None`) - client secret for the same exchanges.
 - `token_store` (AbstractTokenStore | None, default `None`) - backing store for cached OBO tokens. See [Scope matching for cached OBO tokens](#scope-matching-for-cached-obo-tokens).
 - `scope_matching` (str, default `"strict"`) - how cached OBO tokens are matched to the scopes a tool asks for, either `"strict"` or `"non_strict"`. See [Scope matching for cached OBO tokens](#scope-matching-for-cached-obo-tokens).
@@ -102,9 +102,9 @@ See [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/
 `required_scopes` applies to every request on the server, whatever the tool, resource or prompt. It is separate from `tool_scopes`, which only advertises scopes for the client to ask for at login. For how required scopes are advertised, see [Tool Scopes](./ToolScopes.md). For which token claim scopes are read from, see [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md).
 
 - An invalid, expired or empty token is rejected by `Auth0TokenVerifier`, and FastMCP answers `401`.
-- A token bound to a DPoP key or a client certificate (it has a `cnf` claim) is rejected the same way with `invalid_token`, because it cannot be used as a Bearer token.
+- DPoP is not supported. A request that uses the `DPoP` authorization scheme, or a token bound to a DPoP key or a client certificate (it has a `cnf` claim), is rejected the same way with `invalid_token`, because it cannot be used as a Bearer token.
 - A valid token that lacks a required scope gets a `403` with `insufficient_scope`. The text names the missing scope (`Required scope: <scope>`) because the official `mcp` SDK writes it.
-- If Auth0 cannot be reached to check a token, the verifier raises `AuthServerUnavailableError` instead of reporting the token as bad. The server answers `503` with `Retry-After: 5` and `Cache-Control: no-store` headers and no `WWW-Authenticate` challenge, so the client keeps its token and can try again instead of logging in again. This applies to the provider from `Auth0FastMCP` only, a hand-wired provider answers with FastMCP's own `500`.
+- If Auth0 cannot be reached to check a token, the verifier raises `AuthServerUnavailableError` instead of reporting the token as bad. The server answers `503` with `Retry-After: 5` and `Cache-Control: no-store` headers and no `WWW-Authenticate` challenge, so the client keeps its token and can try again instead of logging in again. This applies to the provider from `Auth0FastMCP` only. A hand-wired provider answers with FastMCP's own `500`.
 
 In every case the handler never runs.
 
