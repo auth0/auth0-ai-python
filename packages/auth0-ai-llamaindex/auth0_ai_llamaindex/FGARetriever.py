@@ -17,10 +17,13 @@ from llama_index.core.schema import (
 
 
 def _check_key(check) -> tuple:
-    """Hashable identity for an FGA check, including its canonicalized context."""
+    """Hashable identity for an FGA check, including its canonicalized context
+    and contextual tuples (both sent per check item in BatchCheck)."""
     context = getattr(check, "context", None)
     context_key = json.dumps(context, sort_keys=True) if context else None
-    return (check.relation, check.object, check.user, context_key)
+    tuples = [t.tuple_key.to_dict() for t in getattr(check, "contextual_tuples", None) or []]
+    tuples_key = json.dumps(tuples, sort_keys=True) if tuples else None
+    return (check.relation, check.object, check.user, context_key, tuples_key)
 
 
 class FGARetriever(BaseRetriever):

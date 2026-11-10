@@ -1,7 +1,7 @@
 """
 Regression tests for GHSA-43rq-mx95-c3xx / SEC-80753.
 
-Docs differing only by ``context`` must not share a batch-check result. Ordered
+Docs differing only by ``context`` or ``contextual_tuples`` must not share a batch-check result. Ordered
 [denied, allowed] so a regression leaks the denied doc (fails) rather than
 silently over-restricting. Mocks only the OpenFGA client, which echoes each
 distinct check back like the service does.
@@ -14,15 +14,16 @@ from auth0_ai_langchain.FGARetriever import FGARetriever
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 from openfga_sdk import ClientConfiguration
-from openfga_sdk.client.models import ClientBatchCheckItem
+from openfga_sdk.client.models import ClientBatchCheckItem, ClientTuple
 
 
-def _make_check(context):
+def _make_check(context, contextual_tuples=None):
     check = MagicMock(spec=ClientBatchCheckItem)
     check.user = "user:jane"
     check.object = "doc:budget"
     check.relation = "viewer"
     check.context = context
+    check.contextual_tuples = contextual_tuples
     return check
 
 
@@ -56,6 +57,10 @@ def _allow_nested(check):
     return bool(check.context and check.context.get("dept", {}).get("level") == 5)
 
 
+def _allow_public_group(check):
+    return any(t.object == "group:public" for t in check.contextual_tuples or [])
+
+
 # --- scenarios: (name, build_query, allowed_fn) -------------------------------
 
 SCENARIOS = [
@@ -68,6 +73,20 @@ SCENARIOS = [
         "same_object_differing_nested_context",
         lambda doc: _make_check({"dept": {"level": 5 if doc.id == "d_allow" else 2}}),
         _allow_nested,
+    ),
+    (
+        "same_object_differing_contextual_tuples",
+        lambda doc: _make_check(
+            None,
+            [
+                ClientTuple(
+                    user="user:jane",
+                    relation="member",
+                    object="group:public" if doc.id == "d_allow" else "group:secret",
+                )
+            ],
+        ),
+        _allow_public_group,
     ),
 ]
 
