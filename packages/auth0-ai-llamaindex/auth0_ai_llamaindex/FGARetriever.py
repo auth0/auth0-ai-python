@@ -17,16 +17,7 @@ from llama_index.core.schema import (
 
 
 def _check_key(check) -> tuple:
-    """
-    Build a complete, hashable identity for an FGA check.
-
-    Includes ``context`` (canonicalized with ``json.dumps(sort_keys=True)``,
-    which sorts keys at every depth and preserves all values) alongside
-    relation/object/user so that checks differing only by their condition
-    parameters are treated as distinct. Used as the single source of truth for
-    deduplication, the node-to-check mapping, and result correlation, so a
-    denied node can no longer inherit an allowed result.
-    """
+    """Hashable identity for an FGA check, including its canonicalized context."""
     context = getattr(check, "context", None)
     context_key = json.dumps(context, sort_keys=True) if context else None
     return (check.relation, check.object, check.user, context_key)

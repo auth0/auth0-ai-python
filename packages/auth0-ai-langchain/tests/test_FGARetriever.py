@@ -60,9 +60,7 @@ async def test_async_get_relevant_docs(
     query = "test_query"
     run_manager = MagicMock()
     docs = [MagicMock(spec=Document, id=i) for i in range(doc_count)]
-    # Checks must carry their full identity (relation/object/user/context) so
-    # that each result correlates back to exactly one check. `context=None`
-    # mirrors a query builder that sets no condition parameters.
+    # Checks carry full identity so each result correlates to exactly one check.
     mock_query_builder.side_effect = [
         MagicMock(spec=ClientBatchCheckItem, object=f"doc:{i}",
                   relation="viewer", user="user:jane", context=None)
@@ -113,9 +111,7 @@ def test_get_relevant_docs(
     query = "test_query"
     run_manager = MagicMock()
     docs = [MagicMock(spec=Document, id=i) for i in range(doc_count)]
-    # Checks must carry their full identity (relation/object/user/context) so
-    # that each result correlates back to exactly one check. `context=None`
-    # mirrors a query builder that sets no condition parameters.
+    # Checks carry full identity so each result correlates to exactly one check.
     mock_query_builder.side_effect = [
         MagicMock(spec=ClientBatchCheckItem, object=f"doc:{i}",
                   relation="viewer", user="user:jane", context=None)

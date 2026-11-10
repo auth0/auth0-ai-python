@@ -1,19 +1,10 @@
 """
-Regression tests for GHSA-rcmp-9f79-cfm9 / SEC-80753.
+Regression tests for GHSA-43rq-mx95-c3xx / SEC-80753.
 
-The FGARetriever deduplicated/correlated OpenFGA results with an incomplete key
-(relation/object/user, and a permissions_map keyed on ``object`` alone). Two
-nodes whose checks differ only by ``context`` collapsed into a single check, and
-the denied node inherited the allowed result and leaked into the output.
-
-These tests drive the real FGARetriever and mock only the OpenFGA client. The
-mock authorizes each *distinct* check on its own merits and echoes the request
-back, exactly like the service, so correlating each result to the right node is
-the retriever's responsibility.
-
-Nodes are ordered [denied, allowed] on purpose: under the old key the *allowed*
-check wins deduplication, so a regression would let the denied node leak —
-making these tests fail rather than silently pass via over-restriction.
+Nodes differing only by ``context`` must not share a batch-check result. Ordered
+[denied, allowed] so a regression leaks the denied node (fails) rather than
+silently over-restricting. Mocks only the OpenFGA client, which echoes each
+distinct check back like the service does.
 """
 from contextlib import asynccontextmanager, contextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -130,8 +121,7 @@ async def test_async_denied_node_is_filtered_out(name, build_query, allowed_fn):
 
 
 def test_sync_identical_checks_are_deduplicated():
-    # Optimization guardrail: checks identical in every dimension (including
-    # context) must still be sent to FGA only once.
+    # Fully identical checks must still dedupe to one batch item.
     nodes = [_node("a"), _node("b")]
     retriever = _make_retriever(lambda node: _make_check({"authorized": True}))
     retriever._retriever._retrieve.return_value = nodes
