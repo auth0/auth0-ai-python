@@ -13,7 +13,7 @@ import pytest
 from auth0_ai_llamaindex.FGARetriever import FGARetriever
 from llama_index.core.retrievers import BaseRetriever
 from llama_index.core.schema import NodeWithScore
-from openfga_sdk import ClientConfiguration
+from openfga_sdk import ClientConfiguration, RelationshipCondition
 from openfga_sdk.client.models import ClientBatchCheckItem, ClientTuple
 
 
@@ -68,6 +68,13 @@ def _allow_public_group(check):
     return any(t.object == "group:public" for t in check.contextual_tuples or [])
 
 
+def _allow_tuple_condition_level(check):
+    return any(
+        t.condition and t.condition.context.get("level") == 5
+        for t in check.contextual_tuples or []
+    )
+
+
 SCENARIOS = [
     (
         "same_object_differing_context",
@@ -92,6 +99,24 @@ SCENARIOS = [
             ],
         ),
         _allow_public_group,
+    ),
+    (
+        "same_object_tuples_differing_only_by_condition_context",
+        lambda node: _make_check(
+            None,
+            [
+                ClientTuple(
+                    user="user:jane",
+                    relation="member",
+                    object="group:eng",
+                    condition=RelationshipCondition(
+                        name="min_level",
+                        context={"level": 5 if node.marker == "d_allow" else 2},
+                    ),
+                )
+            ],
+        ),
+        _allow_tuple_condition_level,
     ),
 ]
 
