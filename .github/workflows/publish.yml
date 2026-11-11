@@ -9,6 +9,7 @@ on:
         required: true
         options:
           - auth0-ai-mcp
+          - auth0-ai-fastmcp
 
 permissions:
   contents: read
