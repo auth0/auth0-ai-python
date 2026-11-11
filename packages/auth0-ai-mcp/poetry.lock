@@ -102,27 +102,23 @@ markers = {main = "extra == \"mcp\""}
 
 [[package]]
 name = "auth0-api-python"
-version = "1.0.0b10"
+version = "1.0.0b11"
 description = "SDK for verifying access tokens and securing APIs with Auth0, using Authlib."
 optional = false
-python-versions = ">=3.9.2"
+python-versions = ">=3.10"
 groups = ["main"]
-files = []
-develop = false
+files = [
+    {file = "auth0_api_python-1.0.0b11-py3-none-any.whl", hash = "sha256:b1d82997300f83b6874c7a8f4a5fb9ff58fb4c63b83c81d188b278a472d0f72f"},
+    {file = "auth0_api_python-1.0.0b11.tar.gz", hash = "sha256:08216a30c371bf7d716793cb287872e7c6cefc533d8639bddcaba55157e4052d"},
+]
 
 [package.dependencies]
-ada-url = {version = "^1.30.0", markers = "python_version >= \"3.10\""}
-authlib = "^1.0"
+ada-url = ">=1.30.0,<2.0.0"
+authlib = ">=1.0,<2.0"
 cryptography = ">=43.0.1"
-httpx = "^0.28.1"
-jwcrypto = "^1.5.7"
-requests = "^2.31.0"
-
-[package.source]
-type = "git"
-url = "https://github.com/auth0/auth0-api-python.git"
-reference = "1fe1a417e867d417b4bd44c5984fe002f11149f9"
-resolved_reference = "1fe1a417e867d417b4bd44c5984fe002f11149f9"
+httpx = ">=0.28.1,<0.29.0"
+jwcrypto = ">=1.5.7,<2.0.0"
+requests = ">=2.31.0,<3.0.0"
 
 [[package]]
 name = "authlib"
@@ -1732,4 +1728,4 @@ mcp = ["mcp"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<4.0"
-content-hash = "407e01acf42d671cc427d9991f583eb64dce046c5a6bcb55b2d83f7be1ed45cf"
+content-hash = "032dc2a4c91f2a314633af2800da6fbb69e05194a641ab406daf64fe9e028546"
