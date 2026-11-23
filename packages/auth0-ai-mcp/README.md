@@ -104,11 +104,11 @@ async def get_weather(location: str) -> dict:
 - [Configuration](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/Configuration.md) - every client and middleware option.
 - [Token Verification](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenVerification.md) - how the incoming token is checked and the `Principal` is built.
 - [Request Context](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/RequestContext.md) - reading the caller inside a tool.
-- [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md) - gating tools on the caller's scopes.
-- [On-Behalf-Of](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OnBehalfOf.md) - exchanging the caller's token for a downstream token.
-- [Token Vault](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenVault.md) - exchanging the caller's token for a federated provider token via Token Vault.
-- [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenCaching.md) - the optional OBO cache and scope-matching modes.
-- [Organization Policy](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OrganizationPolicy.md) - accepting or requiring an Organization.
+- [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md) - gating tools on the caller's scopes. Example: [checking a scope inside a tool](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/EXAMPLES.md#checking-a-second-scope-inside-a-tool).
+- [On-Behalf-Of](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OnBehalfOf.md) - exchanging the caller's token for a downstream token. Example: [calling two APIs from one tool](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/EXAMPLES.md#calling-two-downstream-apis-from-one-tool).
+- [Token Vault](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenVault.md) - exchanging the caller's token for a federated provider token via Token Vault. Example: [Token Vault with your own API](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/EXAMPLES.md#combining-token-vault-with-your-own-api-in-one-tool).
+- [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenCaching.md) - the optional OBO cache and scope-matching modes. Example: [caching tokens](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/EXAMPLES.md#caching-exchanged-tokens).
+- [Organization Policy](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OrganizationPolicy.md) - accepting or requiring an Organization. Example: [accepting one organization](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/EXAMPLES.md#accepting-only-one-organization).
 - [Writing an Adapter](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/WritingAnAdapter.md) - wiring the core into any MCP framework.
 - [Examples](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/EXAMPLES.md) - a full runnable server.
 
