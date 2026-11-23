@@ -79,11 +79,11 @@ Resources and prompts are gated the same way. See [Gating resources and prompts]
 
 These guides cover the behavior this package builds on. In FastMCP code, import the scope helpers from `auth0_ai_fastmcp` and not from `auth0_ai_mcp`. The `auth0_ai_mcp` versions still deny the call, but with `mask_error_details=True` the client sees only `Error calling tool 'x'` and the server logs an ERROR traceback.
 
-- [On-Behalf-Of](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OnBehalfOf.md) - get a token for a downstream API for the caller.
-- [Token Vault](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenVault.md) - get a token for a third-party provider such as Google.
-- [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenCaching.md) - reuse exchanged tokens with a token store.
+- [On-Behalf-Of](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/OnBehalfOf.md) - get a token for a downstream API for the caller. Example: [calling two APIs from one tool](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/EXAMPLES.md#calling-two-downstream-apis-from-one-tool).
+- [Token Vault](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenVault.md) - get a token for a third-party provider such as Google. Example: [Token Vault with your own API](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/EXAMPLES.md#combining-token-vault-with-your-own-api-in-one-tool).
+- [Token Caching](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/TokenCaching.md) - reuse exchanged tokens with a token store. Example: [caching tokens](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/EXAMPLES.md#caching-exchanged-tokens).
 - [Request Context](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/RequestContext.md) - read the caller inside a tool.
-- [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md) - check the caller's scopes before a tool runs.
+- [Scope Enforcement](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-mcp/docs/ScopeEnforcement.md) - check the caller's scopes before a tool runs. Example: [checking a scope inside a tool](https://github.com/auth0/auth0-ai-python/blob/main/packages/auth0-ai-fastmcp/EXAMPLES.md#checking-a-second-scope-inside-a-tool).
 
 ## Feedback
 
